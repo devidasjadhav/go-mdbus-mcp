@@ -268,6 +268,279 @@ func NewReadCoilsTool(mc *ModbusClient) fxctx.Tool {
 	)
 }
 
+func NewWriteHoldingRegistersTool(mc *ModbusClient) fxctx.Tool {
+	return fxctx.NewTool(
+		&mcp.Tool{
+			Name:        "write-holding-registers",
+			Description: Ptr("Write values to Modbus holding registers"),
+			InputSchema: mcp.ToolInputSchema{
+				Type: "object",
+				Properties: map[string]map[string]interface{}{
+					"address": {
+						"type":        "integer",
+						"description": "Starting address to write to",
+					},
+					"values": {
+						"type": "array",
+						"items": map[string]interface{}{
+							"type": "integer",
+						},
+						"description": "Array of uint16 values to write",
+					},
+				},
+				Required: []string{"address", "values"},
+			},
+		},
+		func(ctx context.Context, args map[string]interface{}) *mcp.CallToolResult {
+			// Connect for this operation
+			if err := mc.EnsureConnected(); err != nil {
+				return &mcp.CallToolResult{
+					Content: []interface{}{
+						mcp.TextContent{
+							Type: "text",
+							Text: fmt.Sprintf("Failed to connect to Modbus server: %v", err),
+						},
+					},
+					IsError: Ptr(true),
+				}
+			}
+			defer mc.Close() // Always close connection after operation
+
+			addressFloat, ok := args["address"].(float64)
+			if !ok {
+				return &mcp.CallToolResult{
+					Content: []interface{}{
+						mcp.TextContent{
+							Type: "text",
+							Text: fmt.Sprintf("Invalid address parameter: %v", args["address"]),
+						},
+					},
+					IsError: Ptr(true),
+				}
+			}
+
+			valuesInterface, ok := args["values"]
+			if !ok {
+				return &mcp.CallToolResult{
+					Content: []interface{}{
+						mcp.TextContent{
+							Type: "text",
+							Text: "Missing values parameter",
+						},
+					},
+					IsError: Ptr(true),
+				}
+			}
+
+			valuesInterfaceSlice, ok := valuesInterface.([]interface{})
+			if !ok {
+				return &mcp.CallToolResult{
+					Content: []interface{}{
+						mcp.TextContent{
+							Type: "text",
+							Text: fmt.Sprintf("Invalid values parameter: expected array, got %T", valuesInterface),
+						},
+					},
+					IsError: Ptr(true),
+				}
+			}
+
+			address := uint16(addressFloat)
+			values := make([]uint16, len(valuesInterfaceSlice))
+
+			for i, val := range valuesInterfaceSlice {
+				valFloat, ok := val.(float64)
+				if !ok {
+					return &mcp.CallToolResult{
+						Content: []interface{}{
+							mcp.TextContent{
+								Type: "text",
+								Text: fmt.Sprintf("Invalid value at index %d: expected number, got %T", i, val),
+							},
+						},
+						IsError: Ptr(true),
+					}
+				}
+				values[i] = uint16(valFloat)
+			}
+
+			log.Printf("Writing holding registers: address=%d, values=%v", address, values)
+
+			// Convert uint16 values to byte array (big-endian)
+			data := make([]byte, len(values)*2)
+			for i, val := range values {
+				data[i*2] = byte(val >> 8)     // High byte
+				data[i*2+1] = byte(val & 0xFF) // Low byte
+			}
+
+			// Write multiple registers
+			_, err := mc.client.WriteMultipleRegisters(address, uint16(len(values)), data)
+			if err != nil {
+				log.Printf("Error writing holding registers: %v", err)
+				return &mcp.CallToolResult{
+					Content: []interface{}{
+						mcp.TextContent{
+							Type: "text",
+							Text: fmt.Sprintf("Error writing holding registers: %v", err),
+						},
+					},
+					IsError: Ptr(true),
+				}
+			}
+
+			log.Printf("Successfully wrote %d holding register values", len(values))
+
+			return &mcp.CallToolResult{
+				Content: []interface{}{
+					mcp.TextContent{
+						Type: "text",
+						Text: fmt.Sprintf("Successfully wrote %d values to holding registers starting at address %d: %v", len(values), address, values),
+					},
+				},
+			}
+		},
+	)
+}
+
+func NewWriteCoilsTool(mc *ModbusClient) fxctx.Tool {
+	return fxctx.NewTool(
+		&mcp.Tool{
+			Name:        "write-coils",
+			Description: Ptr("Write values to Modbus coils (digital outputs)"),
+			InputSchema: mcp.ToolInputSchema{
+				Type: "object",
+				Properties: map[string]map[string]interface{}{
+					"address": {
+						"type":        "integer",
+						"description": "Starting address to write to",
+					},
+					"values": {
+						"type": "array",
+						"items": map[string]interface{}{
+							"type": "boolean",
+						},
+						"description": "Array of boolean values to write",
+					},
+				},
+				Required: []string{"address", "values"},
+			},
+		},
+		func(ctx context.Context, args map[string]interface{}) *mcp.CallToolResult {
+			// Connect for this operation
+			if err := mc.EnsureConnected(); err != nil {
+				return &mcp.CallToolResult{
+					Content: []interface{}{
+						mcp.TextContent{
+							Type: "text",
+							Text: fmt.Sprintf("Failed to connect to Modbus server: %v", err),
+						},
+					},
+					IsError: Ptr(true),
+				}
+			}
+			defer mc.Close() // Always close connection after operation
+
+			addressFloat, ok := args["address"].(float64)
+			if !ok {
+				return &mcp.CallToolResult{
+					Content: []interface{}{
+						mcp.TextContent{
+							Type: "text",
+							Text: fmt.Sprintf("Invalid address parameter: %v", args["address"]),
+						},
+					},
+					IsError: Ptr(true),
+				}
+			}
+
+			valuesInterface, ok := args["values"]
+			if !ok {
+				return &mcp.CallToolResult{
+					Content: []interface{}{
+						mcp.TextContent{
+							Type: "text",
+							Text: "Missing values parameter",
+						},
+					},
+					IsError: Ptr(true),
+				}
+			}
+
+			valuesInterfaceSlice, ok := valuesInterface.([]interface{})
+			if !ok {
+				return &mcp.CallToolResult{
+					Content: []interface{}{
+						mcp.TextContent{
+							Type: "text",
+							Text: fmt.Sprintf("Invalid values parameter: expected array, got %T", valuesInterface),
+						},
+					},
+					IsError: Ptr(true),
+				}
+			}
+
+			address := uint16(addressFloat)
+			values := make([]bool, len(valuesInterfaceSlice))
+
+			for i, val := range valuesInterfaceSlice {
+				valBool, ok := val.(bool)
+				if !ok {
+					return &mcp.CallToolResult{
+						Content: []interface{}{
+							mcp.TextContent{
+								Type: "text",
+								Text: fmt.Sprintf("Invalid value at index %d: expected boolean, got %T", i, val),
+							},
+						},
+						IsError: Ptr(true),
+					}
+				}
+				values[i] = valBool
+			}
+
+			log.Printf("Writing coils: address=%d, values=%v", address, values)
+
+			// Convert boolean array to byte array for Modbus
+			byteCount := (len(values) + 7) / 8 // Calculate bytes needed
+			coilBytes := make([]byte, byteCount)
+
+			for i, val := range values {
+				if val {
+					byteIndex := i / 8
+					bitIndex := uint(i % 8)
+					coilBytes[byteIndex] |= (1 << bitIndex)
+				}
+			}
+
+			// Write multiple coils
+			_, err := mc.client.WriteMultipleCoils(address, uint16(len(values)), coilBytes)
+			if err != nil {
+				log.Printf("Error writing coils: %v", err)
+				return &mcp.CallToolResult{
+					Content: []interface{}{
+						mcp.TextContent{
+							Type: "text",
+							Text: fmt.Sprintf("Error writing coils: %v", err),
+						},
+					},
+					IsError: Ptr(true),
+				}
+			}
+
+			log.Printf("Successfully wrote %d coil values", len(values))
+
+			return &mcp.CallToolResult{
+				Content: []interface{}{
+					mcp.TextContent{
+						Type: "text",
+						Text: fmt.Sprintf("Successfully wrote %d values to coils starting at address %d: %v", len(values), address, values),
+					},
+				},
+			}
+		},
+	)
+}
+
 func main() {
 	// Parse command-line arguments
 	modbusIP := flag.String("modbus-ip", "192.168.1.22", "Modbus server IP address")
@@ -289,6 +562,10 @@ func main() {
 		// adding the tools to the app
 		WithTool(func() fxctx.Tool { return NewReadHoldingRegistersTool(modbusClient) }).
 		WithTool(func() fxctx.Tool { return NewReadCoilsTool(modbusClient) }).
+		WithTool(func() fxctx.Tool { return NewWriteHoldingRegistersTool(modbusClient) }).
+		WithTool(func() fxctx.Tool { return NewWriteCoilsTool(modbusClient) }).
+		WithTool(func() fxctx.Tool { return NewWriteHoldingRegistersTool(modbusClient) }).
+		WithTool(func() fxctx.Tool { return NewWriteCoilsTool(modbusClient) }).
 		WithServerCapabilities(&mcp.ServerCapabilities{
 			Tools: &mcp.ServerCapabilitiesTools{
 				ListChanged: Ptr(false),
