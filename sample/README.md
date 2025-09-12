@@ -35,6 +35,8 @@ go run main.go --modbus-ip 192.168.1.100 --modbus-port 502
 ### Available Tools
 
 1. **read-holding-registers**: Read Modbus holding registers with automatic reconnection
+2. **read-coils**: Read Modbus coils (digital inputs/outputs) with bit processing
+2. **read-coils**: Read Modbus coils (digital outputs) with per-operation connections
 
 ### Example API Calls
 
@@ -69,6 +71,56 @@ curl -X POST \
     ]
   },
   "id": 1
+}
+```
+
+#### Read Coils
+
+```bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"read-coils","arguments":{"address":0,"quantity":14}},"id":1}' \
+  http://localhost:8080/mcp
+```
+
+**Expected Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "Coil states starting at address 0:\nCoil 0: ON\nCoil 1: ON\nCoil 2: ON\nCoil 3: ON\nCoil 4: ON\nCoil 5: ON\nCoil 6: OFF\nCoil 7: OFF\nCoil 8: OFF\nCoil 9: OFF\nCoil 10: OFF\nCoil 11: ON\nCoil 12: OFF\nCoil 13: OFF",
+        "type": "text"
+      }
+    ]
+  },
+  "id": 1
+}
+```
+
+#### Read Coils
+
+```bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"read-coils","arguments":{"address":0,"quantity":8}},"id":2}' \
+  http://localhost:8080/mcp
+```
+
+**Expected Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "Coils at address 0: [true false true false false false false true]",
+        "type": "text"
+      }
+    ]
+  },
+  "id": 2
 }
 ```
 
@@ -143,12 +195,15 @@ go install github.com/f/mcptools/cmd/mcptools@latest
 
 ✅ **Server Status**: The server starts successfully on `http://localhost:8080/mcp`
 
-✅ **Available Tools** (1 tool):
-- `read-holding-registers` - Read Modbus holding registers with automatic reconnection
+✅ **Available Tools** (2 tools):
+- `read-holding-registers` - Read Modbus holding registers with per-operation connections
+- `read-coils` - Read Modbus coils (digital outputs) with per-operation connections
 
 ✅ **Tool Functionality**:
 - Returns holding register values as uint16 arrays: `[100 42 0 0 0 0 0 0 0 123]`
-- Handles connection drops gracefully with automatic reconnection
+- Returns coil states as individual ON/OFF values with addresses
+- Properly processes Modbus bit-packed coil data (8 coils per byte)
+- Uses per-operation connections to prevent timeout issues
 - Provides detailed error messages for connection issues
 
 ✅ **MCP Protocol Compliance**: Server properly handles initialization, tool listing, and tool calling according to MCP specification
