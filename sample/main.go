@@ -27,10 +27,9 @@ type Config struct {
 }
 
 type ModbusClient struct {
-	client    modbus.Client
-	handler   *modbus.TCPClientHandler
-	connected bool
-	config    *Config
+	client  modbus.Client
+	handler *modbus.TCPClientHandler
+	config  *Config
 }
 
 func NewModbusClient(config *Config) *ModbusClient {
@@ -48,49 +47,26 @@ func NewModbusClient(config *Config) *ModbusClient {
 }
 
 func (mc *ModbusClient) Connect() error {
-	err := mc.handler.Connect()
-	if err == nil {
-		mc.connected = true
-	}
-	return err
+	return mc.handler.Connect()
 }
 
 func (mc *ModbusClient) Close() error {
-	if mc.connected && mc.handler != nil {
-		mc.connected = false
+	if mc.handler != nil {
 		return mc.handler.Close()
 	}
 	return nil
 }
 
 func (mc *ModbusClient) EnsureConnected() error {
-	if mc.connected {
-		return nil
-	}
+	// Always recreate handler for fresh connection
+	mc.handler = modbus.NewTCPClientHandler(fmt.Sprintf("%s:%d", mc.config.ModbusIP, mc.config.ModbusPort))
+	mc.handler.Timeout = 10000000000 // 10 seconds
+	mc.handler.SlaveId = 0
+	mc.handler.Logger = log.Default()
 
-	// Close any existing connection first
-	if mc.handler != nil {
-		mc.handler.Close()
-		mc.connected = false
-	}
+	mc.client = modbus.NewClient(mc.handler)
 
-	// Try to reconnect with existing handler
-	err := mc.Connect()
-	if err != nil {
-		// If reconnection fails, recreate the handler and try again
-		mc.handler = modbus.NewTCPClientHandler(fmt.Sprintf("%s:%d", mc.config.ModbusIP, mc.config.ModbusPort))
-		mc.handler.Timeout = 10000000000 // 10 seconds
-		mc.handler.SlaveId = 0
-		mc.handler.Logger = log.Default()
-
-		mc.client = modbus.NewClient(mc.handler)
-
-		err = mc.Connect()
-		if err != nil {
-			return fmt.Errorf("failed to reconnect: %v", err)
-		}
-	}
-	return nil
+	return mc.Connect()
 }
 
 func NewReadHoldingRegistersTool(mc *ModbusClient) fxctx.Tool {
@@ -114,6 +90,7 @@ func NewReadHoldingRegistersTool(mc *ModbusClient) fxctx.Tool {
 			},
 		},
 		func(ctx context.Context, args map[string]interface{}) *mcp.CallToolResult {
+			// Connect for this operation
 			if err := mc.EnsureConnected(); err != nil {
 				return &mcp.CallToolResult{
 					Content: []interface{}{
@@ -125,6 +102,7 @@ func NewReadHoldingRegistersTool(mc *ModbusClient) fxctx.Tool {
 					IsError: Ptr(true),
 				}
 			}
+			defer mc.Close() // Always close connection after operation
 
 			addressFloat, ok := args["address"].(float64)
 			if !ok {
@@ -202,13 +180,7 @@ func main() {
 	fmt.Printf("Connecting to Modbus server at %s:%d\n", config.ModbusIP, config.ModbusPort)
 
 	modbusClient := NewModbusClient(config)
-	if err := modbusClient.Connect(); err != nil {
-		log.Printf("Warning: Failed to connect to Modbus server: %v", err)
-		log.Println("Server will start but Modbus tools will return errors")
-	} else {
-		fmt.Println("Successfully connected to Modbus server")
-		defer modbusClient.Close()
-	}
+	fmt.Println("Modbus client initialized - will connect per operation")
 
 	server := app.
 		NewBuilder().
