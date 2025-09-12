@@ -8,12 +8,7 @@ out:
         "tools":
           [
             {
-              "description": "The great tool",
-              "name": "my-great-tool",
-              "inputSchema": { "type": "object" },
-            },
-            {
-              "description": "Read Modbus coils (digital outputs)",
+              "description": "Read Modbus coils (digital inputs/outputs)",
               "name": "read-coils",
               "inputSchema": {
                 "type": "object",
@@ -37,15 +32,33 @@ out:
               },
             },
             {
-              "description": "Write to a Modbus coil (digital output)",
-              "name": "write-coil",
+              "description": "Write values to Modbus coils (digital outputs)",
+              "name": "write-coils",
               "inputSchema": {
                 "type": "object",
                 "properties": {
                   "address": { "type": "integer" },
-                  "value": { "type": "boolean" }
+                  "values": {
+                    "type": "array",
+                    "items": { "type": "boolean" }
+                  }
                 },
-                "required": ["address", "value"]
+                "required": ["address", "values"]
+              },
+            },
+            {
+              "description": "Write values to Modbus holding registers",
+              "name": "write-holding-registers",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "address": { "type": "integer" },
+                  "values": {
+                    "type": "array",
+                    "items": { "type": "integer" }
+                  }
+                },
+                "required": ["address", "values"]
               },
             },
           ],
