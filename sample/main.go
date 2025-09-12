@@ -166,6 +166,108 @@ func NewReadHoldingRegistersTool(mc *ModbusClient) fxctx.Tool {
 	)
 }
 
+func NewReadCoilsTool(mc *ModbusClient) fxctx.Tool {
+	return fxctx.NewTool(
+		&mcp.Tool{
+			Name:        "read-coils",
+			Description: Ptr("Read Modbus coils (digital inputs/outputs)"),
+			InputSchema: mcp.ToolInputSchema{
+				Type: "object",
+				Properties: map[string]map[string]interface{}{
+					"address": {
+						"type":        "integer",
+						"description": "Starting address to read from",
+					},
+					"quantity": {
+						"type":        "integer",
+						"description": "Number of coils to read",
+					},
+				},
+				Required: []string{"address", "quantity"},
+			},
+		},
+		func(ctx context.Context, args map[string]interface{}) *mcp.CallToolResult {
+			// Connect for this operation
+			if err := mc.EnsureConnected(); err != nil {
+				return &mcp.CallToolResult{
+					Content: []interface{}{
+						mcp.TextContent{
+							Type: "text",
+							Text: fmt.Sprintf("Failed to connect to Modbus server: %v", err),
+						},
+					},
+					IsError: Ptr(true),
+				}
+			}
+			defer mc.Close() // Always close connection after operation
+
+			addressFloat, ok := args["address"].(float64)
+			if !ok {
+				return &mcp.CallToolResult{
+					Content: []interface{}{
+						mcp.TextContent{
+							Type: "text",
+							Text: "Invalid address parameter: must be a number",
+						},
+					},
+					IsError: Ptr(true),
+				}
+			}
+			quantityFloat, ok := args["quantity"].(float64)
+			if !ok {
+				return &mcp.CallToolResult{
+					Content: []interface{}{
+						mcp.TextContent{
+							Type: "text",
+							Text: "Invalid quantity parameter: must be a number",
+						},
+					},
+					IsError: Ptr(true),
+				}
+			}
+
+			address := uint16(addressFloat)
+			quantity := uint16(quantityFloat)
+
+			log.Printf("Reading coils: address=%d, quantity=%d", address, quantity)
+			results, err := mc.client.ReadCoils(address, quantity)
+			if err != nil {
+				log.Printf("Error reading coils: %v", err)
+				return &mcp.CallToolResult{
+					Content: []interface{}{
+						mcp.TextContent{
+							Type: "text",
+							Text: fmt.Sprintf("Error reading coils: %v", err),
+						},
+					},
+					IsError: Ptr(true),
+				}
+			}
+			log.Printf("Successfully read %d bytes", len(results))
+
+			// Convert byte array to individual coil states
+			// Each byte contains 8 coil states (bits)
+			coilStates := make([]bool, quantity)
+			for i := uint16(0); i < quantity; i++ {
+				byteIndex := i / 8
+				bitIndex := i % 8
+				if byteIndex < uint16(len(results)) {
+					coilStates[i] = (results[byteIndex] & (1 << bitIndex)) != 0
+				}
+			}
+
+			return &mcp.CallToolResult{
+				Content: []interface{}{
+					mcp.TextContent{
+						Type: "text",
+						Text: fmt.Sprintf("Coils at address %d: %v", address, coilStates),
+					},
+				},
+			}
+		},
+	)
+}
+
 func main() {
 	// Parse command-line arguments
 	modbusIP := flag.String("modbus-ip", "192.168.1.22", "Modbus server IP address")
@@ -186,6 +288,7 @@ func main() {
 		NewBuilder().
 		// adding the tools to the app
 		WithTool(func() fxctx.Tool { return NewReadHoldingRegistersTool(modbusClient) }).
+		WithTool(func() fxctx.Tool { return NewReadCoilsTool(modbusClient) }).
 		WithServerCapabilities(&mcp.ServerCapabilities{
 			Tools: &mcp.ServerCapabilitiesTools{
 				ListChanged: Ptr(false),
