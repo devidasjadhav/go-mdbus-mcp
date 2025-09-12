@@ -21,9 +21,15 @@ sample/
 ├── modbus/
 │   ├── client.go        # Modbus client implementation
 │   └── tools.go         # MCP tool definitions
+├── docs/                # 📚 Comprehensive documentation
+│   ├── README.md        # Documentation overview
+│   ├── architecture.md  # System architecture & design
+│   ├── api-reference.md # Complete API documentation
+│   ├── development.md   # Development guide & workflow
+│   └── deployment.md    # Production deployment guide
 ├── go.mod               # Go module definition
 ├── go.sum               # Dependency checksums
-└── README.md            # This file
+└── README.md            # This file (main project README)
 ```
 
 ## Prerequisites
@@ -226,6 +232,22 @@ Build and run the server:
 go build -o modbus-server main.go
 ./modbus-server --modbus-ip 192.168.1.22 --modbus-port 5002
 ```
+
+## 📚 Documentation
+
+For comprehensive documentation, see the [`docs/`](./docs/) directory:
+
+- **[📋 Documentation Overview](./docs/README.md)** - Complete guide to all documentation
+- **[🏗️ Architecture](./docs/architecture.md)** - System design, data flow, and design decisions
+- **[🔧 API Reference](./docs/api-reference.md)** - Complete API documentation with examples
+- **[💻 Development Guide](./docs/development.md)** - Setup, workflow, and contribution guidelines
+- **[🚀 Deployment Guide](./docs/deployment.md)** - Production deployment and configuration
+
+**Quick Start for Documentation:**
+1. **New to the project?** → Start with [Architecture](./docs/architecture.md)
+2. **Need API details?** → Check [API Reference](./docs/api-reference.md)
+3. **Want to contribute?** → Read [Development Guide](./docs/development.md)
+4. **Deploying to production?** → Follow [Deployment Guide](./docs/deployment.md)
 
 ### Manual Testing with mcptools
 
