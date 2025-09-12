@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -17,21 +18,34 @@ import (
 	"github.com/devidasjadhav/go-mdbus-mcp/modbus"
 )
 
+// Version information set during build
+var version = "dev"
+
 func main() {
 	// Parse command-line arguments
 	modbusIP := flag.String("modbus-ip", "192.168.1.22", "Modbus server IP address")
 	modbusPort := flag.Int("modbus-port", 5002, "Modbus server port")
+	showVersion := flag.Bool("version", false, "Show version information")
 	flag.Parse()
+
+	// Show version if requested
+	if *showVersion {
+		fmt.Printf("Modbus MCP Server v%s\n", version)
+		fmt.Println("https://github.com/devidasjadhav/go-mdbus-mcp")
+		return
+	}
 
 	config := &modbus.Config{
 		ModbusIP:   *modbusIP,
 		ModbusPort: *modbusPort,
 	}
 
-	fmt.Printf("Connecting to Modbus server at %s:%d\n", config.ModbusIP, config.ModbusPort)
+	fmt.Printf("🚀 Modbus MCP Server v%s\n", version)
+	fmt.Printf("📡 Connecting to Modbus server at %s:%d\n", config.ModbusIP, config.ModbusPort)
 
 	modbusClient := modbus.NewModbusClient(config)
-	fmt.Println("Modbus client initialized - will connect per operation")
+	fmt.Println("🔧 Modbus client initialized - will connect per operation")
+	fmt.Println("📖 For help, visit: https://github.com/devidasjadhav/go-mdbus-mcp")
 
 	server := app.
 		NewBuilder().
@@ -70,6 +84,25 @@ func main() {
 				},
 			)),
 		)
+
+	// Add health check endpoint
+	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  "healthy",
+			"version": version,
+			"service": "modbus-mcp-server",
+		})
+	})
+
+	// Start health check server in a goroutine
+	go func() {
+		log.Println("🏥 Health check server starting on :8081")
+		if err := http.ListenAndServe(":8081", nil); err != nil {
+			log.Printf("Health check server error: %v", err)
+		}
+	}()
 
 	err := server.Run()
 	if err != nil {

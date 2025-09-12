@@ -34,6 +34,57 @@ This is a simplified MCP (Model Context Protocol) server that provides Modbus TC
 └── README.md            # This file (main project README)
 ```
 
+## 🤖 CI/CD Pipeline
+
+This project includes a comprehensive GitHub Actions CI/CD pipeline that automatically:
+
+- **Tests** the code on every push and pull request
+- **Builds** binaries for multiple platforms (Linux, macOS, Windows)
+- **Creates releases** when you push version tags
+- **Builds Docker images** and pushes to Docker Hub
+- **Generates release notes** automatically
+
+### Creating a Release
+
+1. **Update version in code** (optional)
+2. **Create and push a tag**:
+   ```bash
+   git tag v1.0.0
+   git push origin v1.0.0
+   ```
+
+3. **Or use the Makefile**:
+   ```bash
+   make release-patch    # v0.0.1 → v0.0.2
+   make release-minor    # v0.0.1 → v0.1.0
+   make release-major    # v0.0.1 → v1.0.0
+   ```
+
+4. **GitHub Actions will**:
+   - Run tests and build binaries
+   - Create a GitHub release
+   - Upload platform-specific binaries
+   - Generate automatic release notes
+   - Build and push Docker image
+
+### Available Platforms
+
+The CI/CD pipeline builds binaries for:
+- **Linux**: amd64, arm64
+- **macOS**: amd64, arm64 (Apple Silicon)
+- **Windows**: amd64
+
+### Docker Support
+
+Automated Docker builds are triggered on releases:
+```bash
+# Pull the latest image
+docker pull ghcr.io/devidasjadhav/go-mdbus-mcp:latest
+
+# Or use a specific version
+docker pull ghcr.io/devidasjadhav/go-mdbus-mcp:v1.0.0
+```
+
 ## Prerequisites
 
 - A running Modbus TCP server (for testing, you can use a simulator)
@@ -48,12 +99,41 @@ This is a simplified MCP (Model Context Protocol) server that provides Modbus TC
 
 ### Start the Server
 
+#### Using Go Directly
 ```bash
+# Build first
+go build -o modbus-server main.go
+
 # Connect to test Modbus server on default port
-go run main.go
+./modbus-server
 
 # Connect to specific Modbus server
-go run main.go --modbus-ip 192.168.1.100 --modbus-port 502
+./modbus-server --modbus-ip 192.168.1.100 --modbus-port 502
+```
+
+#### Using Make
+```bash
+# Quick development setup
+make setup
+make build
+make run
+
+# Or run in development mode
+make run-dev
+
+# Show all available commands
+make help
+```
+
+#### Using Docker
+```bash
+# Build and run
+make docker-build
+make docker-run
+
+# Or manually
+docker build -t modbus-mcp-server .
+docker run -p 8080:8080 -p 8081:8081 modbus-mcp-server
 ```
 
 ### Available Tools

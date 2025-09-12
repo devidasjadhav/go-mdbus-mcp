@@ -1,0 +1,42 @@
+# Git
+.git
+.gitignore
+.github
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Test files
+*_test.go
+testdata/
+test_gemini.py
+gemini_integration_guide.md
+
+# Development files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Build artifacts
+modbus-server
+*.exe
+*.tar.gz
+
+# CI/CD
+.github/
+
+# Temporary files
+*.tmp
+*.log
