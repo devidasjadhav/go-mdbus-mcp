@@ -4,11 +4,27 @@ This is a simplified MCP (Model Context Protocol) server that provides Modbus TC
 
 ## Features
 
-- **Modbus TCP Client**: Connects to Modbus TCP servers with automatic reconnection
-- **MCP Tools**: Provides a single tool for reading holding registers
-- **Automatic Reconnection**: Handles connection drops gracefully by recreating handlers
+- **Modbus TCP Client**: Connects to Modbus TCP servers with per-operation connections
+- **MCP Tools**: Provides 4 tools for reading/writing holding registers and coils
+- **Modular Architecture**: Well-organized code structure with separate packages
+- **Automatic Connection Management**: Fresh connections for each operation prevent timeouts
 - **HTTP Transport**: Uses streamable HTTP transport for MCP communication
 - **Debug Logging**: Includes detailed logging for troubleshooting
+
+## Project Structure
+
+```
+sample/
+├── main.go              # Entry point and server setup
+├── config/
+│   └── config.go        # Configuration structures
+├── modbus/
+│   ├── client.go        # Modbus client implementation
+│   └── tools.go         # MCP tool definitions
+├── go.mod               # Go module definition
+├── go.sum               # Dependency checksums
+└── README.md            # This file
+```
 
 ## Prerequisites
 
@@ -193,13 +209,22 @@ The server uses a per-operation connection strategy to prevent timeout issues:
 Run the automated tests:
 
 ```bash
-go test
+go test ./...
 ```
 
 Or with mcp-autotest:
 
 ```bash
 mcp-autotest run -u http://localhost:8080/mcp testdata -- go run main.go --modbus-ip 127.0.0.1 --modbus-port 502
+```
+
+### Manual Testing
+
+Build and run the server:
+
+```bash
+go build -o modbus-server main.go
+./modbus-server --modbus-ip 192.168.1.22 --modbus-port 5002
 ```
 
 ### Manual Testing with mcptools
@@ -276,10 +301,10 @@ go install github.com/f/mcptools/cmd/mcptools@latest
 ## Recent Improvements
 
 ### Version Updates
-- **Simplified Architecture**: Focused on read-holding-registers functionality only
-- **Enhanced Reliability**: Increased timeout to 10 seconds for better network handling
-- **Improved Slave ID**: Changed to 0 (standard default for Modbus TCP)
+- **Modular Architecture**: Refactored code into organized packages (config, modbus)
+- **Enhanced Tool Set**: Added write functionality for both holding registers and coils
 - **Per-Operation Connections**: Fixed timeout issues by using fresh connections for each operation
+- **Improved Code Organization**: Separated concerns into logical modules
 - **Automatic Connection Cleanup**: Proper resource management with automatic connection closing
 - **Debug Logging**: Added detailed logging for troubleshooting connection and communication issues
 
