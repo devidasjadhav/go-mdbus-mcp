@@ -74,12 +74,14 @@ curl -X POST \
 
 ## Connection Management
 
-The server includes robust connection management:
+The server uses a per-operation connection strategy to prevent timeout issues:
 
-- **Automatic Reconnection**: If the connection to the Modbus server drops, the server will automatically attempt to reconnect
-- **Handler Recreation**: When reconnection fails, the server recreates the Modbus handler to ensure clean connections
-- **Timeout Handling**: 10-second timeout for reliable operation with slower networks
-- **Debug Logging**: Detailed logs help troubleshoot connection issues
+- **Per-Operation Connections**: Creates a fresh TCP connection for each read operation and closes it immediately after
+- **No Persistent Connections**: Eliminates connection timeout problems that occur with idle persistent connections
+- **Automatic Cleanup**: Connections are automatically closed using defer statements to ensure proper resource management
+- **Fresh Handler Creation**: Each operation creates a new Modbus handler for reliable communication
+- **Timeout Handling**: 10-second timeout per operation for reliable operation with slower networks
+- **Debug Logging**: Detailed logs help troubleshoot connection and communication issues
 
 ## Testing
 
@@ -157,8 +159,8 @@ go install github.com/f/mcptools/cmd/mcptools@latest
 
 - **Slave ID**: Fixed to 0 (common default for Modbus TCP servers)
 - **Timeout**: 10 seconds (increased for better reliability)
-- **Connection**: TCP with automatic reconnection and handler recreation
-- **Reconnection**: Automatic with exponential backoff and handler recreation
+- **Connection**: TCP with per-operation connections (connect → read → close)
+- **Connection Management**: Fresh connections for each operation to prevent timeouts
 
 ## Recent Improvements
 
@@ -166,15 +168,17 @@ go install github.com/f/mcptools/cmd/mcptools@latest
 - **Simplified Architecture**: Focused on read-holding-registers functionality only
 - **Enhanced Reliability**: Increased timeout to 10 seconds for better network handling
 - **Improved Slave ID**: Changed to 0 (standard default for Modbus TCP)
-- **Automatic Reconnection**: Robust connection recovery with handler recreation
-- **Debug Logging**: Added detailed logging for troubleshooting connection issues
+- **Per-Operation Connections**: Fixed timeout issues by using fresh connections for each operation
+- **Automatic Connection Cleanup**: Proper resource management with automatic connection closing
+- **Debug Logging**: Added detailed logging for troubleshooting connection and communication issues
 
 ### Connection Resilience
 The server now handles network interruptions gracefully:
-- Detects connection drops automatically
-- Recreates Modbus handlers when needed
-- Retries connections with proper error handling
+- Uses per-operation connections to prevent timeout issues
+- Creates fresh Modbus handlers for each operation
+- Automatic connection cleanup prevents resource leaks
 - Provides clear error messages for debugging
+- Eliminates persistent connection timeout problems
 
 ## Error Handling
 
