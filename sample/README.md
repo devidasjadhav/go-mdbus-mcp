@@ -36,7 +36,8 @@ go run main.go --modbus-ip 192.168.1.100 --modbus-port 502
 
 1. **read-holding-registers**: Read Modbus holding registers with automatic reconnection
 2. **read-coils**: Read Modbus coils (digital inputs/outputs) with bit processing
-2. **read-coils**: Read Modbus coils (digital outputs) with per-operation connections
+3. **write-holding-registers**: Write values to Modbus holding registers
+4. **write-coils**: Write values to Modbus coils (digital outputs)
 
 ### Example API Calls
 
@@ -90,7 +91,57 @@ curl -X POST \
   "result": {
     "content": [
       {
-        "text": "Coil states starting at address 0:\nCoil 0: ON\nCoil 1: ON\nCoil 2: ON\nCoil 3: ON\nCoil 4: ON\nCoil 5: ON\nCoil 6: OFF\nCoil 7: OFF\nCoil 8: OFF\nCoil 9: OFF\nCoil 10: OFF\nCoil 11: ON\nCoil 12: OFF\nCoil 13: OFF",
+        "text": "Coils at address 0: [false true true true true true false false false false false true false false]",
+        "type": "text"
+      }
+    ]
+  },
+  "id": 1
+}
+```
+
+#### Write Holding Registers
+
+```bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"write-holding-registers","arguments":{"address":10,"values":[1234,5678,9999]}},"id":1}' \
+  http://localhost:8080/mcp
+```
+
+**Expected Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "Successfully wrote 3 values to holding registers starting at address 10: [1234 5678 9999]",
+        "type": "text"
+      }
+    ]
+  },
+  "id": 1
+}
+```
+
+#### Write Coils
+
+```bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"write-coils","arguments":{"address":5,"values":[true,false,true,true,false]}},"id":1}' \
+  http://localhost:8080/mcp
+```
+
+**Expected Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "Successfully wrote 5 values to coils starting at address 5: [true false true true false]",
         "type": "text"
       }
     ]
@@ -200,9 +251,14 @@ go install github.com/f/mcptools/cmd/mcptools@latest
 - `read-coils` - Read Modbus coils (digital outputs) with per-operation connections
 
 ✅ **Tool Functionality**:
-- Returns holding register values as uint16 arrays: `[100 42 0 0 0 0 0 0 0 123]`
-- Returns coil states as individual ON/OFF values with addresses
-- Properly processes Modbus bit-packed coil data (8 coils per byte)
+- **Read Operations**:
+  - Returns holding register values as uint16 arrays: `[100 42 0 0 0 0 0 0 0 123]`
+  - Returns coil states as boolean arrays: `[false true true true true true false false]`
+  - Properly processes Modbus bit-packed coil data (8 coils per byte)
+- **Write Operations**:
+  - Writes multiple holding register values: `[1234 5678 9999]`
+  - Writes multiple coil states: `[true false true true false]`
+  - Automatic data conversion (uint16[] to bytes for registers, bool[] to bit-packed bytes for coils)
 - Uses per-operation connections to prevent timeout issues
 - Provides detailed error messages for connection issues
 
