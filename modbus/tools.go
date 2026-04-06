@@ -12,18 +12,21 @@ import (
 type ReadArgs struct {
 	Address  uint16 `json:"address" jsonschema:"Starting address to read from"`
 	Quantity uint16 `json:"quantity" jsonschema:"Number of registers or coils to read"`
+	SlaveID  *uint8 `json:"slave_id,omitempty" jsonschema:"Optional Modbus Slave ID (defaults to 1)"`
 }
 
 // WriteHoldingRegistersArgs defines the input schema for writing holding registers.
 type WriteHoldingRegistersArgs struct {
 	Address uint16   `json:"address" jsonschema:"Starting address to write to"`
 	Values  []uint16 `json:"values" jsonschema:"Array of uint16 values to write"`
+	SlaveID *uint8   `json:"slave_id,omitempty" jsonschema:"Optional Modbus Slave ID (defaults to 1)"`
 }
 
 // WriteCoilsArgs defines the input schema for writing coils.
 type WriteCoilsArgs struct {
 	Address uint16 `json:"address" jsonschema:"Starting address to write to"`
 	Values  []bool `json:"values" jsonschema:"Array of boolean values to write"`
+	SlaveID *uint8 `json:"slave_id,omitempty" jsonschema:"Optional Modbus Slave ID (defaults to 1)"`
 }
 
 // RegisterTools registers all available modbus tools to the MCP server.
@@ -34,7 +37,7 @@ func RegisterTools(s *mcp.Server, mc *ModbusClient) {
 			Description: "Read Modbus holding registers",
 		},
 		func(ctx context.Context, req *mcp.CallToolRequest, args ReadArgs) (*mcp.CallToolResult, any, error) {
-			return executeTool(mc, func() (*mcp.CallToolResult, error) {
+			return executeTool(mc, args.SlaveID, func() (*mcp.CallToolResult, error) {
 				log.Printf("Reading holding registers: address=%d, quantity=%d", args.Address, args.Quantity)
 				results, err := mc.Client().ReadHoldingRegisters(args.Address, args.Quantity)
 				if err != nil {
@@ -57,7 +60,7 @@ func RegisterTools(s *mcp.Server, mc *ModbusClient) {
 			Description: "Read Modbus coils (digital inputs/outputs)",
 		},
 		func(ctx context.Context, req *mcp.CallToolRequest, args ReadArgs) (*mcp.CallToolResult, any, error) {
-			return executeTool(mc, func() (*mcp.CallToolResult, error) {
+			return executeTool(mc, args.SlaveID, func() (*mcp.CallToolResult, error) {
 				log.Printf("Reading coils: address=%d, quantity=%d", args.Address, args.Quantity)
 				results, err := mc.Client().ReadCoils(args.Address, args.Quantity)
 				if err != nil {
@@ -84,7 +87,7 @@ func RegisterTools(s *mcp.Server, mc *ModbusClient) {
 			Description: "Write values to Modbus holding registers",
 		},
 		func(ctx context.Context, req *mcp.CallToolRequest, args WriteHoldingRegistersArgs) (*mcp.CallToolResult, any, error) {
-			return executeTool(mc, func() (*mcp.CallToolResult, error) {
+			return executeTool(mc, args.SlaveID, func() (*mcp.CallToolResult, error) {
 				log.Printf("Writing holding registers: address=%d, values=%v", args.Address, args.Values)
 				data := make([]byte, len(args.Values)*2)
 				for i, val := range args.Values {
@@ -108,7 +111,7 @@ func RegisterTools(s *mcp.Server, mc *ModbusClient) {
 			Description: "Write values to Modbus coils (digital outputs)",
 		},
 		func(ctx context.Context, req *mcp.CallToolRequest, args WriteCoilsArgs) (*mcp.CallToolResult, any, error) {
-			return executeTool(mc, func() (*mcp.CallToolResult, error) {
+			return executeTool(mc, args.SlaveID, func() (*mcp.CallToolResult, error) {
 				log.Printf("Writing coils: address=%d, values=%v", args.Address, args.Values)
 				byteCount := (len(args.Values) + 7) / 8
 				coilBytes := make([]byte, byteCount)
@@ -131,7 +134,14 @@ func RegisterTools(s *mcp.Server, mc *ModbusClient) {
 
 // executeTool is a helper to run thread-safe operations on the Modbus client
 // and handle any protocol errors.
-func executeTool(mc *ModbusClient, operation func() (*mcp.CallToolResult, error)) (*mcp.CallToolResult, any, error) {
+func executeTool(mc *ModbusClient, slaveID *uint8, operation func() (*mcp.CallToolResult, error)) (*mcp.CallToolResult, any, error) {
+	// Set SlaveID right before executing
+	if slaveID != nil {
+		mc.SetSlaveID(*slaveID)
+	} else {
+		mc.SetSlaveID(1) // default to 1 if not provided
+	}
+
 	res, err := mc.Execute(operation)
 	if err != nil {
 		// As per the official SDK docs, we return formatting errors directly inside CallToolResult

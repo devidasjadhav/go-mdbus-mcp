@@ -49,6 +49,11 @@ func (mc *ModbusClient) Close() error {
 	return nil
 }
 
+// SetSlaveID updates the target Slave ID for the next operation
+func (mc *ModbusClient) SetSlaveID(slaveID uint8) {
+	mc.handler.SlaveId = slaveID
+}
+
 // Client returns the thread-safe underlying modbus client
 func (mc *ModbusClient) Client() modbus.Client {
 	return mc.client
