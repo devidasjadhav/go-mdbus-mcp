@@ -12,6 +12,7 @@ import (
 	"github.com/strowk/foxy-contexts/pkg/fxctx"
 	"github.com/strowk/foxy-contexts/pkg/mcp"
 	"github.com/strowk/foxy-contexts/pkg/server"
+	"github.com/strowk/foxy-contexts/pkg/sse"
 	"github.com/strowk/foxy-contexts/pkg/stdio"
 	"github.com/strowk/foxy-contexts/pkg/streamable_http"
 	"go.uber.org/fx"
@@ -31,7 +32,7 @@ func main() {
 	// Parse command-line arguments
 	modbusIP := flag.String("modbus-ip", "192.168.1.22", "Modbus server IP address")
 	modbusPort := flag.Int("modbus-port", 5002, "Modbus server port")
-	transportFlag := flag.String("transport", "http", "Transport to use: http or stdio")
+	transportFlag := flag.String("transport", "http", "Transport to use: http, stdio, or sse")
 	showVersion := flag.Bool("version", false, "Show version information")
 	flag.Parse()
 
@@ -56,9 +57,12 @@ func main() {
 	fmt.Fprintln(os.Stderr, "📖 For help, visit: https://github.com/devidasjadhav/go-mdbus-mcp")
 
 	var mcpTransport server.Transport
-	if *transportFlag == "stdio" {
+	switch *transportFlag {
+	case "stdio":
 		mcpTransport = stdio.NewTransport()
-	} else {
+	case "sse":
+		mcpTransport = sse.NewTransport(sse.WithPort(8080))
+	default: // "http" or any other value
 		mcpTransport = streamable_http.NewTransport(
 			streamable_http.Endpoint{
 				Hostname: "0.0.0.0",
@@ -102,7 +106,7 @@ func main() {
 
 	// Add health check endpoint if we're not running in stdio mode,
 	// or optionally start it in background regardless.
-	if *transportFlag == "http" {
+	if *transportFlag != "stdio" {
 		http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)

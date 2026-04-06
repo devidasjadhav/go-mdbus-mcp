@@ -3,8 +3,11 @@ package modbus
 import (
 	"fmt"
 	"log"
+	"sync"
+	"time"
 
 	"github.com/goburrow/modbus"
+	"github.com/strowk/foxy-contexts/pkg/mcp"
 )
 
 // ModbusClient handles Modbus TCP connections
@@ -12,6 +15,7 @@ type ModbusClient struct {
 	client  modbus.Client
 	handler *modbus.TCPClientHandler
 	config  *Config
+	mu      sync.Mutex // Ensures thread safety for concurrent tool calls
 }
 
 // Config holds the configuration for the Modbus client
@@ -23,8 +27,8 @@ type Config struct {
 // NewModbusClient creates a new Modbus client
 func NewModbusClient(config *Config) *ModbusClient {
 	handler := modbus.NewTCPClientHandler(fmt.Sprintf("%s:%d", config.ModbusIP, config.ModbusPort))
-	handler.Timeout = 10000000000 // 10 seconds
-	handler.SlaveId = 0           // Try slave ID 0
+	handler.Timeout = 10 * time.Second
+	handler.SlaveId = 0 // Common default
 	handler.Logger = log.Default()
 
 	client := modbus.NewClient(handler)
@@ -35,30 +39,32 @@ func NewModbusClient(config *Config) *ModbusClient {
 	}
 }
 
-// Connect establishes a connection to the Modbus server
-func (mc *ModbusClient) Connect() error {
-	return mc.handler.Connect()
-}
-
 // Close closes the connection to the Modbus server
 func (mc *ModbusClient) Close() error {
+	mc.mu.Lock()
+	defer mc.mu.Unlock()
 	if mc.handler != nil {
 		return mc.handler.Close()
 	}
 	return nil
 }
 
-// EnsureConnected ensures the client is connected, reconnecting if necessary
-func (mc *ModbusClient) EnsureConnected() error {
-	// Always recreate handler for fresh connection
-	mc.handler = modbus.NewTCPClientHandler(fmt.Sprintf("%s:%d", mc.config.ModbusIP, mc.config.ModbusPort))
-	mc.handler.Timeout = 10000000000 // 10 seconds
-	mc.handler.SlaveId = 0
-	mc.handler.Logger = log.Default()
+// Client returns the thread-safe underlying modbus client
+func (mc *ModbusClient) Client() modbus.Client {
+	return mc.client
+}
 
-	mc.client = modbus.NewClient(mc.handler)
+// Execute performs a thread-safe Modbus operation and handles auto-reconnection
+func (mc *ModbusClient) Execute(operation func() (*mcp.CallToolResult, error)) (*mcp.CallToolResult, error) {
+	mc.mu.Lock()
+	defer mc.mu.Unlock()
 
-	return mc.Connect()
+	// Ensure connection before executing (goburrow handles reconnect internally, but Connect() forces it)
+	if err := mc.handler.Connect(); err != nil {
+		return nil, fmt.Errorf("failed to connect to Modbus server: %w", err)
+	}
+
+	return operation()
 }
 
 // Ptr is a helper function to get a pointer to a value

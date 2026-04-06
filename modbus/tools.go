@@ -76,12 +76,7 @@ func getBoolArrayArg(args map[string]interface{}, key string) ([]bool, error) {
 }
 
 func withModbusConnection(mc *ModbusClient, handler func() (*mcp.CallToolResult, error)) *mcp.CallToolResult {
-	if err := mc.EnsureConnected(); err != nil {
-		return errorResult(fmt.Sprintf("Failed to connect to Modbus server: %v", err))
-	}
-	defer mc.Close()
-
-	res, err := handler()
+	res, err := mc.Execute(handler)
 	if err != nil {
 		return errorResult(err.Error())
 	}
@@ -119,10 +114,14 @@ func NewReadHoldingRegistersTool(mc *ModbusClient) fxctx.Tool {
 		func(ctx context.Context, args map[string]interface{}) *mcp.CallToolResult {
 			return withModbusConnection(mc, func() (*mcp.CallToolResult, error) {
 				address, err := getUint16Arg(args, "address")
-				if err != nil { return nil, err }
-				
+				if err != nil {
+					return nil, err
+				}
+
 				quantity, err := getUint16Arg(args, "quantity")
-				if err != nil { return nil, err }
+				if err != nil {
+					return nil, err
+				}
 
 				log.Printf("Reading holding registers: address=%d, quantity=%d", address, quantity)
 				results, err := mc.client.ReadHoldingRegisters(address, quantity)
@@ -130,7 +129,7 @@ func NewReadHoldingRegistersTool(mc *ModbusClient) fxctx.Tool {
 					log.Printf("Error reading holding registers: %v", err)
 					return nil, fmt.Errorf("Error reading holding registers: %v", err)
 				}
-				
+
 				log.Printf("Successfully read %d bytes", len(results))
 				values := make([]uint16, len(results)/2)
 				for i := 0; i < len(results); i += 2 {
@@ -161,10 +160,14 @@ func NewReadCoilsTool(mc *ModbusClient) fxctx.Tool {
 		func(ctx context.Context, args map[string]interface{}) *mcp.CallToolResult {
 			return withModbusConnection(mc, func() (*mcp.CallToolResult, error) {
 				address, err := getUint16Arg(args, "address")
-				if err != nil { return nil, err }
-				
+				if err != nil {
+					return nil, err
+				}
+
 				quantity, err := getUint16Arg(args, "quantity")
-				if err != nil { return nil, err }
+				if err != nil {
+					return nil, err
+				}
 
 				log.Printf("Reading coils: address=%d, quantity=%d", address, quantity)
 				results, err := mc.client.ReadCoils(address, quantity)
@@ -172,7 +175,7 @@ func NewReadCoilsTool(mc *ModbusClient) fxctx.Tool {
 					log.Printf("Error reading coils: %v", err)
 					return nil, fmt.Errorf("Error reading coils: %v", err)
 				}
-				
+
 				log.Printf("Successfully read %d bytes", len(results))
 				coilStates := make([]bool, quantity)
 				for i := uint16(0); i < quantity; i++ {
@@ -207,10 +210,14 @@ func NewWriteHoldingRegistersTool(mc *ModbusClient) fxctx.Tool {
 		func(ctx context.Context, args map[string]interface{}) *mcp.CallToolResult {
 			return withModbusConnection(mc, func() (*mcp.CallToolResult, error) {
 				address, err := getUint16Arg(args, "address")
-				if err != nil { return nil, err }
+				if err != nil {
+					return nil, err
+				}
 
 				values, err := getUint16ArrayArg(args, "values")
-				if err != nil { return nil, err }
+				if err != nil {
+					return nil, err
+				}
 
 				log.Printf("Writing holding registers: address=%d, values=%v", address, values)
 				data := make([]byte, len(values)*2)
@@ -250,10 +257,14 @@ func NewWriteCoilsTool(mc *ModbusClient) fxctx.Tool {
 		func(ctx context.Context, args map[string]interface{}) *mcp.CallToolResult {
 			return withModbusConnection(mc, func() (*mcp.CallToolResult, error) {
 				address, err := getUint16Arg(args, "address")
-				if err != nil { return nil, err }
+				if err != nil {
+					return nil, err
+				}
 
 				values, err := getBoolArrayArg(args, "values")
-				if err != nil { return nil, err }
+				if err != nil {
+					return nil, err
+				}
 
 				log.Printf("Writing coils: address=%d, values=%v", address, values)
 				byteCount := (len(values) + 7) / 8
