@@ -164,11 +164,6 @@ jobs:
           ./modbus-server --modbus-ip YOUR_MODBUS_IP --modbus-port YOUR_MODBUS_PORT
           \`\`\`"
 
-          # Escape for multiline output
-          RELEASE_NOTES="${RELEASE_NOTES//'%'/'%25'}"
-          RELEASE_NOTES="${RELEASE_NOTES//$'\n'/'%0A'}"
-          RELEASE_NOTES="${RELEASE_NOTES//$'\r'/'%0D'}"
-
           echo "notes<<EOF" >> $GITHUB_OUTPUT
           echo "$RELEASE_NOTES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
