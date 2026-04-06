@@ -1,0 +1,16 @@
+# Binaries
+modbus-server
+modbus-server-*
+*.exe
+
+# Go test output
+coverage.out
+coverage.html
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+
+# OS specific
+.DS_Store
