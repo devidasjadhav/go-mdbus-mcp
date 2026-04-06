@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/goburrow/modbus"
-	"github.com/strowk/foxy-contexts/pkg/mcp"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // ModbusClient handles Modbus TCP connections
