@@ -20,16 +20,25 @@ type ModbusClient struct {
 
 // Config holds the configuration for the Modbus client
 type Config struct {
-	ModbusIP   string
-	ModbusPort int
+	ModbusIP       string
+	ModbusPort     int
+	Timeout        time.Duration
+	IdleTimeout    time.Duration
+	DefaultSlaveID uint8
 }
 
 // NewModbusClient creates a new Modbus client
 func NewModbusClient(config *Config) *ModbusClient {
-	handler := modbus.NewTCPClientHandler(fmt.Sprintf("%s:%d", config.ModbusIP, config.ModbusPort))
-	handler.Timeout = 10 * time.Second
-	handler.SlaveId = 0 // Common default
-	handler.Logger = log.Default()
+	if config.Timeout <= 0 {
+		config.Timeout = 10 * time.Second
+	}
+	if config.IdleTimeout <= 0 {
+		// Keep this lower than many PLC/gateway idle timeouts to proactively
+		// close local sockets before the remote peer does.
+		config.IdleTimeout = 2 * time.Second
+	}
+
+	handler := newTCPHandler(config, config.DefaultSlaveID)
 
 	client := modbus.NewClient(handler)
 	return &ModbusClient{
@@ -37,6 +46,15 @@ func NewModbusClient(config *Config) *ModbusClient {
 		handler: handler,
 		config:  config,
 	}
+}
+
+func newTCPHandler(config *Config, slaveID uint8) *modbus.TCPClientHandler {
+	handler := modbus.NewTCPClientHandler(fmt.Sprintf("%s:%d", config.ModbusIP, config.ModbusPort))
+	handler.Timeout = config.Timeout
+	handler.IdleTimeout = config.IdleTimeout
+	handler.SlaveId = slaveID
+	handler.Logger = log.Default()
+	return handler
 }
 
 // Close closes the connection to the Modbus server
@@ -49,23 +67,33 @@ func (mc *ModbusClient) Close() error {
 	return nil
 }
 
-// SetSlaveID updates the target Slave ID for the next operation
-func (mc *ModbusClient) SetSlaveID(slaveID uint8) {
-	mc.handler.SlaveId = slaveID
-}
-
 // Client returns the thread-safe underlying modbus client
 func (mc *ModbusClient) Client() modbus.Client {
 	return mc.client
 }
 
-// Execute performs a thread-safe Modbus operation and handles auto-reconnection
-func (mc *ModbusClient) Execute(operation func() (*mcp.CallToolResult, error)) (*mcp.CallToolResult, error) {
+// Execute performs a thread-safe Modbus operation and refreshes the TCP connection.
+//
+// Some Modbus servers close idle TCP sessions after a short timeout. Reusing the same
+// socket in that case leads to EOF/broken-pipe errors on the next write. To avoid this,
+// each operation closes any prior socket, reconnects, sets the requested slave ID, then
+// runs the Modbus call on a fresh connection.
+func (mc *ModbusClient) Execute(slaveID uint8, operation func() (*mcp.CallToolResult, error)) (*mcp.CallToolResult, error) {
 	mc.mu.Lock()
 	defer mc.mu.Unlock()
 
-	// Ensure connection before executing (goburrow handles reconnect internally, but Connect() forces it)
-	if err := mc.handler.Connect(); err != nil {
+	if mc.handler != nil {
+		if err := mc.handler.Close(); err != nil {
+			log.Printf("modbus: warning: close before reconnect failed: %v", err)
+		}
+	}
+
+	handler := newTCPHandler(mc.config, slaveID)
+
+	mc.handler = handler
+	mc.client = modbus.NewClient(handler)
+
+	if err := handler.Connect(); err != nil {
 		return nil, fmt.Errorf("failed to connect to Modbus server: %w", err)
 	}
 

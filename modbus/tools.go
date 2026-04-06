@@ -38,6 +38,10 @@ func RegisterTools(s *mcp.Server, mc *ModbusClient) {
 		},
 		func(ctx context.Context, req *mcp.CallToolRequest, args ReadArgs) (*mcp.CallToolResult, any, error) {
 			return executeTool(mc, args.SlaveID, func() (*mcp.CallToolResult, error) {
+				if args.Quantity == 0 {
+					return nil, fmt.Errorf("quantity must be greater than 0")
+				}
+
 				log.Printf("Reading holding registers: address=%d, quantity=%d", args.Address, args.Quantity)
 				results, err := mc.Client().ReadHoldingRegisters(args.Address, args.Quantity)
 				if err != nil {
@@ -61,6 +65,10 @@ func RegisterTools(s *mcp.Server, mc *ModbusClient) {
 		},
 		func(ctx context.Context, req *mcp.CallToolRequest, args ReadArgs) (*mcp.CallToolResult, any, error) {
 			return executeTool(mc, args.SlaveID, func() (*mcp.CallToolResult, error) {
+				if args.Quantity == 0 {
+					return nil, fmt.Errorf("quantity must be greater than 0")
+				}
+
 				log.Printf("Reading coils: address=%d, quantity=%d", args.Address, args.Quantity)
 				results, err := mc.Client().ReadCoils(args.Address, args.Quantity)
 				if err != nil {
@@ -88,7 +96,20 @@ func RegisterTools(s *mcp.Server, mc *ModbusClient) {
 		},
 		func(ctx context.Context, req *mcp.CallToolRequest, args WriteHoldingRegistersArgs) (*mcp.CallToolResult, any, error) {
 			return executeTool(mc, args.SlaveID, func() (*mcp.CallToolResult, error) {
+				if len(args.Values) == 0 {
+					return nil, fmt.Errorf("values must contain at least one register value")
+				}
+
 				log.Printf("Writing holding registers: address=%d, values=%v", args.Address, args.Values)
+				if len(args.Values) == 1 {
+					_, err := mc.Client().WriteSingleRegister(args.Address, args.Values[0])
+					if err != nil {
+						return nil, fmt.Errorf("error writing holding register: %w", err)
+					}
+
+					return successResult(fmt.Sprintf("Successfully wrote holding register at address %d: %d", args.Address, args.Values[0])), nil
+				}
+
 				data := make([]byte, len(args.Values)*2)
 				for i, val := range args.Values {
 					data[i*2] = byte(val >> 8)
@@ -112,6 +133,10 @@ func RegisterTools(s *mcp.Server, mc *ModbusClient) {
 		},
 		func(ctx context.Context, req *mcp.CallToolRequest, args WriteCoilsArgs) (*mcp.CallToolResult, any, error) {
 			return executeTool(mc, args.SlaveID, func() (*mcp.CallToolResult, error) {
+				if len(args.Values) == 0 {
+					return nil, fmt.Errorf("values must contain at least one coil value")
+				}
+
 				log.Printf("Writing coils: address=%d, values=%v", args.Address, args.Values)
 				byteCount := (len(args.Values) + 7) / 8
 				coilBytes := make([]byte, byteCount)
@@ -135,14 +160,12 @@ func RegisterTools(s *mcp.Server, mc *ModbusClient) {
 // executeTool is a helper to run thread-safe operations on the Modbus client
 // and handle any protocol errors.
 func executeTool(mc *ModbusClient, slaveID *uint8, operation func() (*mcp.CallToolResult, error)) (*mcp.CallToolResult, any, error) {
-	// Set SlaveID right before executing
+	targetSlaveID := uint8(1)
 	if slaveID != nil {
-		mc.SetSlaveID(*slaveID)
-	} else {
-		mc.SetSlaveID(1) // default to 1 if not provided
+		targetSlaveID = *slaveID
 	}
 
-	res, err := mc.Execute(operation)
+	res, err := mc.Execute(targetSlaveID, operation)
 	if err != nil {
 		// As per the official SDK docs, we return formatting errors directly inside CallToolResult
 		// rather than returning a protocol error to avoid hanging the MCP stream.

@@ -6,7 +6,8 @@ A lightweight, high-performance [Model Context Protocol (MCP)](https://modelcont
 
 - **Official SDK**: Built securely on top of the official `github.com/modelcontextprotocol/go-sdk`.
 - **Multiple Transports**: Fully supports `stdio`, Server-Sent Events (`sse`), and the new Streamable HTTP (`streamable`) MCP protocols.
-- **Connection Pooling**: Thread-safe Modbus dialer handles reconnects and guarantees stability under concurrent tool requests without opening excessive sockets.
+- **Session-Safe Streamable HTTP**: Streamable transport runs in stateless JSON mode to avoid stale session issues (`session not found`) across reconnects.
+- **Resilient Connections**: Thread-safe Modbus dialer reconnects safely for each operation and recovers cleanly from idle timeout disconnects.
 - **Strongly Typed**: Input parsing schemas are automatically generated leveraging JSON Schema struct extraction.
 - **Container Ready**: Includes health checks (`/health` on port 8080) and a multi-stage Docker build process.
 
@@ -68,6 +69,8 @@ To use this server natively in Claude Desktop, add the following to your `claude
 ```
 
 ## Contributing & Testing
+
+Detailed usage and OpenCode validation steps are documented in `HOW_TO_USE.md`.
 
 Standard Go toolchains are used. The heavy lifting is done via the `modbus` folder.
 

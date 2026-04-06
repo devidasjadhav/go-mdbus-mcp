@@ -1,4 +1,4 @@
-.PHONY: help build test clean docker-build
+.PHONY: help build test clean docker-build run-streamable
 
 # Default target
 help:
@@ -7,6 +7,7 @@ help:
 	@echo "  test          Run tests"
 	@echo "  clean         Clean build artifacts"
 	@echo "  docker-build  Build Docker image"
+	@echo "  run-streamable  Run MCP server on :8080"
 
 build:
 	go build -ldflags="-s -w -X main.version=dev" -o modbus-server main.go
@@ -21,3 +22,6 @@ clean:
 
 docker-build:
 	docker build -t modbus-mcp-server .
+
+run-streamable:
+	./modbus-server --transport streamable --modbus-ip 127.0.0.1 --modbus-port 5002
