@@ -1,48 +1,75 @@
-# Modbus MCP Server
+# Go Modbus MCP Server
 
-A lightweight MCP (Model Context Protocol) server for Modbus TCP connectivity.
+A lightweight, high-performance [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for communicating with Modbus TCP devices. It exposes physical PLC hardware logic, registers, and coils to Large Language Models natively via MCP tools.
 
-## Features
+## Key Features
 
-- **Modbus TCP Client**: Connects to Modbus TCP servers with per-operation connections.
-- **MCP Tools**: Provides tools for reading and writing Modbus holding registers and coils.
-- **Multiple Transports**: Supports `stdio`, HTTP (`streamable_http`), and SSE transports.
+- **Official SDK**: Built securely on top of the official `github.com/modelcontextprotocol/go-sdk`.
+- **Multiple Transports**: Fully supports `stdio`, Server-Sent Events (`sse`), and the new Streamable HTTP (`streamable`) MCP protocols.
+- **Connection Pooling**: Thread-safe Modbus dialer handles reconnects and guarantees stability under concurrent tool requests without opening excessive sockets.
+- **Strongly Typed**: Input parsing schemas are automatically generated leveraging JSON Schema struct extraction.
+- **Container Ready**: Includes health checks (`/health` on port 8080) and a multi-stage Docker build process.
+
+## Available Tools
+
+The server exposes the following MCP Tools to your LLM:
+
+1. `read-holding-registers`: Read an array of `uint16` values from a specified address.
+2. `read-coils`: Read an array of `boolean` flags from a specified digital input/output address.
+3. `write-holding-registers`: Write an array of `uint16` values sequentially starting at a specified address.
+4. `write-coils`: Write an array of `boolean` flags sequentially starting at a specified address.
 
 ## Quick Start
 
-### Build & Run
+### Build & Run Locally
+
+Ensure you have Go 1.25+ installed.
 
 ```bash
 go build -o modbus-server main.go
 
-# Run with HTTP Transport (Default, starts on port 8080)
+# Connect to a default simulator (192.168.1.22:5002) using Streamable HTTP on port 8080
 ./modbus-server
 
-# Run with stdio transport (for Claude Desktop, Cursor, etc)
-./modbus-server --transport stdio
+# Connect to a specific PLC IP and Port using STDIO (Best for Claude Desktop / Cursor)
+./modbus-server --modbus-ip 10.0.0.50 --modbus-port 502 --transport stdio
 
-# Run with SSE transport
+# Run using standard Server-Sent Events (SSE)
 ./modbus-server --transport sse
-
-# Run with specific IP/Port
-./modbus-server --modbus-ip 192.168.1.100 --modbus-port 502
 ```
 
-### Docker
+### Docker Usage
 
 ```bash
-docker build -t modbus-mcp-server .
-docker run -p 8080:8080 -p 8081:8081 modbus-mcp-server
+# Build the image
+docker build -t go-mdbus-mcp .
+
+# Run the server (exposes port 8080)
+docker run -p 8080:8080 go-mdbus-mcp ./modbus-server --modbus-ip 10.0.0.50 --modbus-port 502 --transport sse
 ```
 
-## Available Tools
+## Integrating with Claude Desktop
 
-1. `read-holding-registers`: Read Modbus holding registers (returns `uint16` values).
-2. `read-coils`: Read Modbus coils (returns boolean values).
-3. `write-holding-registers`: Write values to Modbus holding registers.
-4. `write-coils`: Write values to Modbus coils.
+To use this server natively in Claude Desktop, add the following to your `claude_desktop_config.json`:
 
-## Testing
+```json
+{
+  "mcpServers": {
+    "modbus": {
+      "command": "/path/to/your/compiled/modbus-server",
+      "args": [
+        "--transport", "stdio",
+        "--modbus-ip", "192.168.1.22",
+        "--modbus-port", "502"
+      ]
+    }
+  }
+}
+```
+
+## Contributing & Testing
+
+Standard Go toolchains are used. The heavy lifting is done via the `modbus` folder.
 
 ```bash
 go test ./...
