@@ -6,10 +6,13 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/strowk/foxy-contexts/pkg/app"
 	"github.com/strowk/foxy-contexts/pkg/fxctx"
 	"github.com/strowk/foxy-contexts/pkg/mcp"
+	"github.com/strowk/foxy-contexts/pkg/server"
+	"github.com/strowk/foxy-contexts/pkg/stdio"
 	"github.com/strowk/foxy-contexts/pkg/streamable_http"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
@@ -22,16 +25,20 @@ import (
 var version = "dev"
 
 func main() {
+	// Ensure standard logging writes to stderr so it doesn't corrupt stdout for stdio transport
+	log.SetOutput(os.Stderr)
+
 	// Parse command-line arguments
 	modbusIP := flag.String("modbus-ip", "192.168.1.22", "Modbus server IP address")
 	modbusPort := flag.Int("modbus-port", 5002, "Modbus server port")
+	transportFlag := flag.String("transport", "http", "Transport to use: http or stdio")
 	showVersion := flag.Bool("version", false, "Show version information")
 	flag.Parse()
 
 	// Show version if requested
 	if *showVersion {
-		fmt.Printf("Modbus MCP Server v%s\n", version)
-		fmt.Println("https://github.com/devidasjadhav/go-mdbus-mcp")
+		fmt.Fprintf(os.Stderr, "Modbus MCP Server v%s\n", version)
+		fmt.Fprintln(os.Stderr, "https://github.com/devidasjadhav/go-mdbus-mcp")
 		return
 	}
 
@@ -40,14 +47,27 @@ func main() {
 		ModbusPort: *modbusPort,
 	}
 
-	fmt.Printf("🚀 Modbus MCP Server v%s\n", version)
-	fmt.Printf("📡 Connecting to Modbus server at %s:%d\n", config.ModbusIP, config.ModbusPort)
+	fmt.Fprintf(os.Stderr, "🚀 Modbus MCP Server v%s\n", version)
+	fmt.Fprintf(os.Stderr, "📡 Connecting to Modbus server at %s:%d\n", config.ModbusIP, config.ModbusPort)
+	fmt.Fprintf(os.Stderr, "🔌 Using %s transport\n", *transportFlag)
 
 	modbusClient := modbus.NewModbusClient(config)
-	fmt.Println("🔧 Modbus client initialized - will connect per operation")
-	fmt.Println("📖 For help, visit: https://github.com/devidasjadhav/go-mdbus-mcp")
+	fmt.Fprintln(os.Stderr, "🔧 Modbus client initialized - will connect per operation")
+	fmt.Fprintln(os.Stderr, "📖 For help, visit: https://github.com/devidasjadhav/go-mdbus-mcp")
 
-	server := app.
+	var mcpTransport server.Transport
+	if *transportFlag == "stdio" {
+		mcpTransport = stdio.NewTransport()
+	} else {
+		mcpTransport = streamable_http.NewTransport(
+			streamable_http.Endpoint{
+				Hostname: "0.0.0.0",
+				Port:     8080,
+				Path:     "/mcp",
+			})
+	}
+
+	builder := app.
 		NewBuilder().
 		// adding the tools to the app
 		WithTool(func() fxctx.Tool { return modbus.NewReadHoldingRegistersTool(modbusClient) }).
@@ -61,20 +81,15 @@ func main() {
 		}).
 		// setting up server
 		WithName("modbus-mcp-server").
-		WithVersion("0.0.1").
-		WithTransport(
-			streamable_http.NewTransport(
-				streamable_http.Endpoint{
-					Hostname: "localhost",
-					Port:     8080,
-					Path:     "/mcp",
-				}),
-		).
-		// Configuring fx logging to only show errors
+		WithVersion(version).
+		WithTransport(mcpTransport).
+		// Configuring fx logging to only show errors, and force zap to use stderr
 		WithFxOptions(
 			fx.Provide(func() *zap.Logger {
 				cfg := zap.NewDevelopmentConfig()
 				cfg.Level.SetLevel(zap.ErrorLevel)
+				cfg.OutputPaths = []string{"stderr"}
+				cfg.ErrorOutputPaths = []string{"stderr"}
 				logger, _ := cfg.Build()
 				return logger
 			}),
@@ -85,26 +100,30 @@ func main() {
 			)),
 		)
 
-	// Add health check endpoint
-	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"status":  "healthy",
-			"version": version,
-			"service": "modbus-mcp-server",
+	// Add health check endpoint if we're not running in stdio mode,
+	// or optionally start it in background regardless.
+	if *transportFlag == "http" {
+		http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"status":  "healthy",
+				"version": version,
+				"service": "modbus-mcp-server",
+			})
 		})
-	})
 
-	// Start health check server in a goroutine
-	go func() {
-		log.Println("🏥 Health check server starting on :8081")
-		if err := http.ListenAndServe(":8081", nil); err != nil {
-			log.Printf("Health check server error: %v", err)
-		}
-	}()
+		go func() {
+			log.Println("🏥 Health check server starting on :8081")
+			if err := http.ListenAndServe(":8081", nil); err != nil {
+				log.Printf("Health check server error: %v", err)
+			}
+		}()
+	}
 
-	err := server.Run()
+	srv := builder
+
+	err := srv.Run()
 	if err != nil {
 		if err == http.ErrServerClosed {
 			log.Println("Server closed")

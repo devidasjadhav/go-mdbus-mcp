@@ -6,7 +6,7 @@ A lightweight MCP (Model Context Protocol) server for Modbus TCP connectivity.
 
 - **Modbus TCP Client**: Connects to Modbus TCP servers with per-operation connections.
 - **MCP Tools**: Provides tools for reading and writing Modbus holding registers and coils.
-- **HTTP Transport**: Uses streamable HTTP transport for MCP communication.
+- **Multiple Transports**: Supports both `stdio` and HTTP-based (`streamable_http`) MCP transports.
 
 ## Quick Start
 
@@ -15,8 +15,11 @@ A lightweight MCP (Model Context Protocol) server for Modbus TCP connectivity.
 ```bash
 go build -o modbus-server main.go
 
-# Run with default settings (Connects to 192.168.1.22:5002)
+# Run with HTTP Transport (Default, starts on port 8080)
 ./modbus-server
+
+# Run with stdio transport (for Claude Desktop, Cursor, etc)
+./modbus-server --transport stdio
 
 # Run with specific IP/Port
 ./modbus-server --modbus-ip 192.168.1.100 --modbus-port 502
