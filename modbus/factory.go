@@ -2,23 +2,24 @@ package modbus
 
 import "strings"
 
-func NewDriver(config *Config) Driver {
+func NewDriver(config *Config) (Driver, error) {
 	driver := strings.ToLower(strings.TrimSpace(config.Driver))
 	if driver == "" {
 		driver = "goburrow"
 	}
 
 	if config.UseMock {
-		return NewModbusClient(config)
+		return NewModbusClient(config), nil
 	}
 
 	switch driver {
 	case "simonvetter":
-		if d, err := newSimonvetterDriver(config); err == nil {
-			return d
+		d, err := newSimonvetterDriver(config)
+		if err != nil {
+			return nil, err
 		}
-		return NewModbusClient(config)
+		return d, nil
 	default:
-		return NewModbusClient(config)
+		return NewModbusClient(config), nil
 	}
 }

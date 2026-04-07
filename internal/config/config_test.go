@@ -161,6 +161,41 @@ func TestToTagMapFromCSVMissingRequiredColumn(t *testing.T) {
 	}
 }
 
+func TestValidateRuntimeOptionsRTURequiresSerialPort(t *testing.T) {
+	opts := &RuntimeOptions{
+		ModbusDriver: "simonvetter",
+		ModbusMode:   "rtu",
+		Transport:    "streamable",
+		BaudRate:     9600,
+		DataBits:     8,
+		Parity:       "N",
+		StopBits:     1,
+	}
+
+	err := ValidateRuntimeOptions(opts)
+	if err == nil {
+		t.Fatalf("expected validation error for missing serial port in rtu mode")
+	}
+}
+
+func TestValidateRuntimeOptionsAcceptsValidRTU(t *testing.T) {
+	opts := &RuntimeOptions{
+		ModbusDriver: "simonvetter",
+		ModbusMode:   "rtu",
+		SerialPort:   "/dev/ttyUSB0",
+		Transport:    "stdio",
+		BaudRate:     9600,
+		DataBits:     8,
+		Parity:       "N",
+		StopBits:     1,
+	}
+
+	err := ValidateRuntimeOptions(opts)
+	if err != nil {
+		t.Fatalf("expected valid RTU options, got: %v", err)
+	}
+}
+
 func ptr[T any](v T) *T {
 	return &v
 }

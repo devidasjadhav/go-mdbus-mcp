@@ -3,7 +3,7 @@ package modbus
 import "testing"
 
 func TestNewDriverSelectsSimonvetterForTCP(t *testing.T) {
-	d := NewDriver(&Config{
+	d, err := NewDriver(&Config{
 		Driver:           "simonvetter",
 		Mode:             "tcp",
 		ModbusIP:         "127.0.0.1",
@@ -11,6 +11,9 @@ func TestNewDriverSelectsSimonvetterForTCP(t *testing.T) {
 		RetryAttempts:    1,
 		CircuitTripAfter: 3,
 	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	if _, ok := d.(*simonvetterDriver); !ok {
 		t.Fatalf("expected simonvetter driver, got %T", d)
@@ -18,16 +21,26 @@ func TestNewDriverSelectsSimonvetterForTCP(t *testing.T) {
 }
 
 func TestNewDriverFallsBackToMockForMockMode(t *testing.T) {
-	d := NewDriver(&Config{
+	d, err := NewDriver(&Config{
 		Driver:        "simonvetter",
 		Mode:          "tcp",
 		UseMock:       true,
 		MockRegisters: 64,
 		MockCoils:     64,
 	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	if _, ok := d.(*ModbusClient); !ok {
 		t.Fatalf("expected mock goburrow-backed driver in mock mode, got %T", d)
+	}
+}
+
+func TestNewDriverRTUMissingSerialPortFails(t *testing.T) {
+	_, err := NewDriver(&Config{Driver: "simonvetter", Mode: "rtu"})
+	if err == nil {
+		t.Fatalf("expected rtu missing serial port error")
 	}
 }
 

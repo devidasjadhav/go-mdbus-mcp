@@ -21,6 +21,20 @@ type simonvetterDriver struct {
 }
 
 func newSimonvetterDriver(config *Config) (*simonvetterDriver, error) {
+	applyCommonDefaults(config)
+	if config.BaudRate <= 0 {
+		config.BaudRate = 9600
+	}
+	if config.DataBits <= 0 {
+		config.DataBits = 8
+	}
+	if config.StopBits <= 0 {
+		config.StopBits = 1
+	}
+	if strings.TrimSpace(config.Parity) == "" {
+		config.Parity = "N"
+	}
+
 	if strings.EqualFold(config.Mode, "rtu") {
 		if strings.TrimSpace(config.SerialPort) == "" {
 			return nil, fmt.Errorf("simonvetter rtu mode requires serial port")
@@ -47,37 +61,52 @@ func (d *simonvetterDriver) Execute(ctx context.Context, slaveID uint8, allowRet
 	}
 
 	var lastErr error
+	rtuMode := strings.EqualFold(strings.TrimSpace(d.config.Mode), "rtu")
 	for attempt := 1; attempt <= attempts; attempt++ {
 		if err := ctx.Err(); err != nil {
 			return nil, fmt.Errorf("operation canceled: %w", err)
 		}
 
-		if d.client != nil {
-			_ = d.client.Close()
-			d.client = nil
+		if !rtuMode {
+			if d.client != nil {
+				_ = d.client.Close()
+				d.client = nil
+			}
 		}
 
-		client, err := d.createClient()
-		if err != nil {
-			lastErr = normalizeDriverError(err)
-		} else {
-			d.client = client
-			if err := d.client.Open(); err != nil {
+		if d.client == nil {
+			client, err := d.createClient()
+			if err != nil {
 				lastErr = normalizeDriverError(err)
 			} else {
-				if err := d.client.SetUnitId(slaveID); err != nil {
+				d.client = client
+				if err := d.client.Open(); err != nil {
 					lastErr = normalizeDriverError(err)
-				} else {
-					res, opErr := operation()
-					_ = d.client.Close()
 					d.client = nil
-					if opErr == nil {
-						d.recordSuccess()
-						return res, nil
-					}
-					lastErr = normalizeDriverError(opErr)
 				}
 			}
+		}
+
+		if d.client != nil {
+			if err := d.client.SetUnitId(slaveID); err != nil {
+				lastErr = normalizeDriverError(err)
+			} else {
+				res, opErr := operation()
+				if !rtuMode {
+					_ = d.client.Close()
+					d.client = nil
+				}
+				if opErr == nil {
+					d.recordSuccess()
+					return res, nil
+				}
+				lastErr = normalizeDriverError(opErr)
+			}
+		}
+
+		if rtuMode && d.client != nil {
+			_ = d.client.Close()
+			d.client = nil
 		}
 
 		if attempt == attempts || !shouldRetryError(lastErr) {

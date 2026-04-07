@@ -14,6 +14,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+var validTransports = map[string]bool{"stdio": true, "sse": true, "streamable": true}
+var validDrivers = map[string]bool{"goburrow": true, "simonvetter": true}
+var validModes = map[string]bool{"tcp": true, "rtu": true}
+var validParities = map[string]bool{"N": true, "E": true, "O": true}
+
 type AppConfig struct {
 	ModbusDriver        *string `json:"modbus_driver" yaml:"modbus_driver"`
 	ModbusMode          *string `json:"modbus_mode" yaml:"modbus_mode"`
@@ -195,6 +200,59 @@ func ApplyConfigOverrides(cfg *AppConfig, setFlags map[string]bool, opts *Runtim
 			return fmt.Errorf("invalid modbus_circuit_open_for %q: %w", *cfg.CircuitOpenFor, err)
 		}
 		opts.CircuitOpenFor = v
+	}
+
+	return nil
+}
+
+func ValidateRuntimeOptions(opts *RuntimeOptions) error {
+	if opts == nil {
+		return nil
+	}
+
+	opts.ModbusDriver = strings.ToLower(strings.TrimSpace(opts.ModbusDriver))
+	if opts.ModbusDriver == "" {
+		opts.ModbusDriver = "goburrow"
+	}
+	if !validDrivers[opts.ModbusDriver] {
+		return fmt.Errorf("invalid modbus driver %q (expected goburrow|simonvetter)", opts.ModbusDriver)
+	}
+
+	opts.ModbusMode = strings.ToLower(strings.TrimSpace(opts.ModbusMode))
+	if opts.ModbusMode == "" {
+		opts.ModbusMode = "tcp"
+	}
+	if !validModes[opts.ModbusMode] {
+		return fmt.Errorf("invalid modbus mode %q (expected tcp|rtu)", opts.ModbusMode)
+	}
+
+	opts.Transport = strings.ToLower(strings.TrimSpace(opts.Transport))
+	if opts.Transport == "" {
+		opts.Transport = "streamable"
+	}
+	if !validTransports[opts.Transport] {
+		return fmt.Errorf("invalid transport %q (expected stdio|sse|streamable)", opts.Transport)
+	}
+
+	opts.Parity = strings.ToUpper(strings.TrimSpace(opts.Parity))
+	if opts.Parity == "" {
+		opts.Parity = "N"
+	}
+	if !validParities[opts.Parity] {
+		return fmt.Errorf("invalid parity %q (expected N|E|O)", opts.Parity)
+	}
+	if opts.DataBits <= 0 {
+		return fmt.Errorf("data bits must be greater than 0")
+	}
+	if opts.StopBits <= 0 {
+		return fmt.Errorf("stop bits must be greater than 0")
+	}
+	if opts.BaudRate <= 0 {
+		return fmt.Errorf("baud rate must be greater than 0")
+	}
+
+	if opts.ModbusMode == "rtu" && strings.TrimSpace(opts.SerialPort) == "" {
+		return fmt.Errorf("serial port is required when modbus mode is rtu")
 	}
 
 	return nil

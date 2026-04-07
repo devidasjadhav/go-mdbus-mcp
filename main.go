@@ -94,6 +94,10 @@ func main() {
 		}
 	}
 
+	if err := appconfig.ValidateRuntimeOptions(&runtimeOpts); err != nil {
+		log.Fatalf("Invalid runtime configuration: %v", err)
+	}
+
 	if *showVersion {
 		fmt.Fprintf(os.Stderr, "Modbus MCP Server v%s\n", version)
 		fmt.Fprintln(os.Stderr, "https://github.com/devidasjadhav/go-mdbus-mcp")
@@ -112,7 +116,7 @@ func main() {
 	}
 
 	// Create Modbus driver
-	driver := modbus.NewDriver(&modbus.Config{
+	driver, err := modbus.NewDriver(&modbus.Config{
 		Driver:           runtimeOpts.ModbusDriver,
 		Mode:             runtimeOpts.ModbusMode,
 		SerialPort:       runtimeOpts.SerialPort,
@@ -134,6 +138,9 @@ func main() {
 		MockRegisters:    runtimeOpts.MockRegisters,
 		MockCoils:        runtimeOpts.MockCoils,
 	})
+	if err != nil {
+		log.Fatalf("failed to create modbus driver: %v", err)
+	}
 	defer func() {
 		if err := driver.Close(); err != nil {
 			log.Printf("failed to close modbus driver: %v", err)

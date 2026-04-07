@@ -87,6 +87,19 @@ func NewModbusClient(config *Config) *ModbusClient {
 		}
 	}
 
+	applyCommonDefaults(config)
+
+	handler := newTCPHandler(config, config.DefaultSlaveID)
+
+	client := modbus.NewClient(handler)
+	return &ModbusClient{
+		client:  client,
+		handler: handler,
+		config:  config,
+	}
+}
+
+func applyCommonDefaults(config *Config) {
 	if config.Timeout <= 0 {
 		config.Timeout = 10 * time.Second
 	}
@@ -106,15 +119,6 @@ func NewModbusClient(config *Config) *ModbusClient {
 	}
 	if config.CircuitOpenFor <= 0 {
 		config.CircuitOpenFor = 2 * time.Second
-	}
-
-	handler := newTCPHandler(config, config.DefaultSlaveID)
-
-	client := modbus.NewClient(handler)
-	return &ModbusClient{
-		client:  client,
-		handler: handler,
-		config:  config,
 	}
 }
 

@@ -50,10 +50,10 @@ Commit target:
 
 Goal: support serial Modbus RTU end-to-end through same tools.
 
-- [ ] Implement RTU path in driver config/build flow.
-- [ ] Add serial parameter validation and safe defaults.
-- [ ] Ensure RTU lifecycle strategy (persistent serial with reconnect on failure).
-- [ ] Add guarded integration tests for RTU (enabled only when test serial env vars are present).
+- [x] Implement RTU path in driver config/build flow.
+- [x] Add serial parameter validation and safe defaults.
+- [x] Ensure RTU lifecycle strategy (persistent serial with reconnect on failure).
+- [x] Add guarded integration tests for RTU (enabled only when test serial env vars are present).
 
 Commit target:
 
