@@ -37,10 +37,10 @@ Commit target:
 
 Goal: support alternate backend with parity on current TCP features.
 
-- [ ] Implement `simonvetter` TCP adapter that satisfies the driver interface.
-- [ ] Add `--modbus-driver` flag and config support.
-- [ ] Normalize adapter errors to internal error categories (timeout/connection/protocol/other).
-- [ ] Add parity tests to ensure equivalent behavior for key tools on both drivers.
+- [x] Implement `simonvetter` TCP adapter that satisfies the driver interface.
+- [x] Add `--modbus-driver` flag and config support.
+- [x] Normalize adapter errors to internal error categories (timeout/connection/protocol/other).
+- [x] Add parity tests to ensure equivalent behavior for key tools on both drivers.
 
 Commit target:
 

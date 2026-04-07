@@ -158,6 +158,65 @@ func TestIntegrationStreamableToolsMockMode(t *testing.T) {
 	assertResultTextContains(t, resp2, "Input registers at address 0")
 }
 
+func TestIntegrationStdioToolsMockModeSimonvetterConfig(t *testing.T) {
+	bin := buildTestBinary(t)
+
+	cmd := exec.Command(bin, "--mock-mode", "--modbus-driver", "simonvetter", "--transport", "stdio")
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		t.Fatalf("failed to get stdin pipe: %v", err)
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		t.Fatalf("failed to get stdout pipe: %v", err)
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		t.Fatalf("failed to get stderr pipe: %v", err)
+	}
+
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("failed to start server: %v", err)
+	}
+	defer func() {
+		_ = stdin.Close()
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+	}()
+
+	go io.Copy(io.Discard, stderr)
+	r := bufio.NewReader(stdout)
+
+	writeJSONLine(t, stdin, map[string]any{
+		"jsonrpc": "2.0",
+		"method":  "initialize",
+		"params": map[string]any{
+			"protocolVersion": "2024-11-05",
+			"capabilities":    map[string]any{},
+			"clientInfo":      map[string]any{"name": "test", "version": "1"},
+		},
+		"id": 1,
+	})
+	_ = readResponseByID(t, r, 1)
+
+	writeJSONLine(t, stdin, map[string]any{"jsonrpc": "2.0", "method": "notifications/initialized"})
+
+	writeJSONLine(t, stdin, map[string]any{
+		"jsonrpc": "2.0",
+		"method":  "tools/call",
+		"params": map[string]any{
+			"name": "read-holding-registers",
+			"arguments": map[string]any{
+				"address":  0,
+				"quantity": 1,
+			},
+		},
+		"id": 2,
+	})
+	resp := readResponseByID(t, r, 2)
+	assertResultTextContains(t, resp, "Holding registers at address 0")
+}
+
 func buildTestBinary(t *testing.T) string {
 	t.Helper()
 	bin := filepath.Join(t.TempDir(), "modbus-server-test")

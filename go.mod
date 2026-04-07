@@ -5,6 +5,7 @@ go 1.25.0
 require (
 	github.com/goburrow/modbus v0.1.0
 	github.com/modelcontextprotocol/go-sdk v1.4.1
+	github.com/simonvetter/modbus v1.6.4
 	gopkg.in/yaml.v3 v3.0.1
 )
 

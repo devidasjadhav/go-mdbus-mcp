@@ -111,8 +111,8 @@ func main() {
 		fmt.Fprintf(os.Stderr, "🧪 Mock mode enabled (registers=%d, coils=%d)\n", runtimeOpts.MockRegisters, runtimeOpts.MockCoils)
 	}
 
-	// Create Modbus client
-	modbusClient := modbus.NewModbusClient(&modbus.Config{
+	// Create Modbus driver
+	driver := modbus.NewDriver(&modbus.Config{
 		Driver:           runtimeOpts.ModbusDriver,
 		Mode:             runtimeOpts.ModbusMode,
 		SerialPort:       runtimeOpts.SerialPort,
@@ -135,8 +135,8 @@ func main() {
 		MockCoils:        runtimeOpts.MockCoils,
 	})
 	defer func() {
-		if err := modbusClient.Close(); err != nil {
-			log.Printf("failed to close modbus client: %v", err)
+		if err := driver.Close(); err != nil {
+			log.Printf("failed to close modbus driver: %v", err)
 		}
 	}()
 
@@ -166,7 +166,7 @@ func main() {
 	emitSecurityWarnings(runtimeOpts.ModbusPort, runtimeOpts.MockMode, writePolicy)
 
 	// Register tools natively with the SDK
-	modbus.RegisterTools(s, modbusClient, writePolicy, tagMap)
+	modbus.RegisterTools(s, driver, writePolicy, tagMap)
 
 	// Start transport with graceful shutdown on SIGINT/SIGTERM.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

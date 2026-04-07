@@ -1,0 +1,60 @@
+package modbus
+
+import "testing"
+
+func TestNewDriverSelectsSimonvetterForTCP(t *testing.T) {
+	d := NewDriver(&Config{
+		Driver:           "simonvetter",
+		Mode:             "tcp",
+		ModbusIP:         "127.0.0.1",
+		ModbusPort:       502,
+		RetryAttempts:    1,
+		CircuitTripAfter: 3,
+	})
+
+	if _, ok := d.(*simonvetterDriver); !ok {
+		t.Fatalf("expected simonvetter driver, got %T", d)
+	}
+}
+
+func TestNewDriverFallsBackToMockForMockMode(t *testing.T) {
+	d := NewDriver(&Config{
+		Driver:        "simonvetter",
+		Mode:          "tcp",
+		UseMock:       true,
+		MockRegisters: 64,
+		MockCoils:     64,
+	})
+
+	if _, ok := d.(*ModbusClient); !ok {
+		t.Fatalf("expected mock goburrow-backed driver in mock mode, got %T", d)
+	}
+}
+
+func TestNormalizeDriverErrorCategories(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{name: "timeout", err: assertErr("i/o timeout"), want: "timeout:"},
+		{name: "connection", err: assertErr("connection refused"), want: "connection:"},
+		{name: "protocol", err: assertErr("modbus exception"), want: "protocol:"},
+		{name: "other", err: assertErr("boom"), want: "other:"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := normalizeDriverError(tc.err)
+			if got == nil || len(got.Error()) < len(tc.want) || got.Error()[:len(tc.want)] != tc.want {
+				t.Fatalf("expected prefix %q, got %v", tc.want, got)
+			}
+		})
+	}
+}
+
+func assertErr(msg string) error { return &testErr{msg: msg} }
+
+type testErr struct{ msg string }
+
+func (e *testErr) Error() string { return e.msg }
