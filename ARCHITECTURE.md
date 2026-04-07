@@ -12,7 +12,7 @@
 ## Core modules
 
 - `main.go`: bootstrap, transport setup, lifecycle
-- `config.go`: config parsing, override application, and CSV tag loading
+- `internal/config/config.go`: config parsing, override application, and CSV tag loading
 - `modbus/client.go`: Modbus client execution, retry/circuit status
 - `modbus/write_policy.go`: write-guarding and allowlists
 - `modbus/tag_map.go`: semantic tag model and validation

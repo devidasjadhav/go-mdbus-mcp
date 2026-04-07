@@ -9,6 +9,17 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
+const (
+	listenAddr            = "0.0.0.0:8080"
+	shutdownTimeout       = 5 * time.Second
+	readHeaderTimeout     = 5 * time.Second
+	readTimeout           = 30 * time.Second
+	writeTimeout          = 30 * time.Second
+	idleTimeout           = 120 * time.Second
+	streamingWriteTimeout = 0 * time.Second
+)
+
+// Run starts the MCP server using the selected transport and blocks until shutdown.
 func Run(ctx context.Context, transport string, server *mcp.Server, version string) error {
 	switch transport {
 	case "stdio":
@@ -22,7 +33,7 @@ func Run(ctx context.Context, transport string, server *mcp.Server, version stri
 		mux.Handle("/message", sseHandler)
 		setupHealthCheck(mux, version)
 
-		httpServer := &http.Server{Addr: "0.0.0.0:8080", Handler: mux}
+		httpServer := newHTTPServer(mux, true)
 		go shutdownOnContextCancel(ctx, httpServer)
 
 		err := httpServer.ListenAndServe()
@@ -41,7 +52,7 @@ func Run(ctx context.Context, transport string, server *mcp.Server, version stri
 		mux.Handle("/mcp", streamableHandler)
 		setupHealthCheck(mux, version)
 
-		httpServer := &http.Server{Addr: "0.0.0.0:8080", Handler: mux}
+		httpServer := newHTTPServer(mux, false)
 		go shutdownOnContextCancel(ctx, httpServer)
 
 		err := httpServer.ListenAndServe()
@@ -52,9 +63,25 @@ func Run(ctx context.Context, transport string, server *mcp.Server, version stri
 	}
 }
 
+func newHTTPServer(handler http.Handler, streaming bool) *http.Server {
+	timeout := writeTimeout
+	if streaming {
+		timeout = streamingWriteTimeout
+	}
+
+	return &http.Server{
+		Addr:              listenAddr,
+		Handler:           handler,
+		ReadHeaderTimeout: readHeaderTimeout,
+		ReadTimeout:       readTimeout,
+		WriteTimeout:      timeout,
+		IdleTimeout:       idleTimeout,
+	}
+}
+
 func shutdownOnContextCancel(ctx context.Context, httpServer *http.Server) {
 	<-ctx.Done()
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	_ = httpServer.Shutdown(shutdownCtx)
 }

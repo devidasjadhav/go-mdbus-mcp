@@ -24,9 +24,9 @@ func registerDataTools(s *mcp.Server, driver Driver, writePolicy *WritePolicy) {
 					return nil, fmt.Errorf("error reading holding registers: %w", err)
 				}
 
-				values := make([]uint16, len(results)/2)
-				for i := 0; i < len(results); i += 2 {
-					values[i/2] = uint16(results[i])<<8 | uint16(results[i+1])
+				values, err := wordsFromBytesStrict(results)
+				if err != nil {
+					return nil, fmt.Errorf("invalid holding register response: %w", err)
 				}
 
 				return successResult(fmt.Sprintf("Holding registers at address %d: %v", args.Address, values)), nil
@@ -48,14 +48,7 @@ func registerDataTools(s *mcp.Server, driver Driver, writePolicy *WritePolicy) {
 					return nil, fmt.Errorf("error reading coils: %w", err)
 				}
 
-				coilStates := make([]bool, args.Quantity)
-				for i := uint16(0); i < args.Quantity; i++ {
-					byteIndex := i / 8
-					bitIndex := i % 8
-					if byteIndex < uint16(len(results)) {
-						coilStates[i] = (results[byteIndex] & (1 << bitIndex)) != 0
-					}
-				}
+				coilStates := boolsFromPackedCoils(results, args.Quantity)
 
 				return successResult(fmt.Sprintf("Coils at address %d: %v", args.Address, coilStates)), nil
 			})
@@ -96,7 +89,7 @@ func registerDataTools(s *mcp.Server, driver Driver, writePolicy *WritePolicy) {
 					return nil, fmt.Errorf("error reading discrete inputs: %w", err)
 				}
 
-				states := coilStatesFromBytes(results, args.Quantity)
+				states := boolsFromPackedCoils(results, args.Quantity)
 				return successResult(fmt.Sprintf("Discrete inputs at address %d: %v", args.Address, states)), nil
 			})
 		},
@@ -152,7 +145,10 @@ func registerDataTools(s *mcp.Server, driver Driver, writePolicy *WritePolicy) {
 					return nil, fmt.Errorf("error reading holding registers: %w", err)
 				}
 
-				words := wordsFromBytes(results)
+				words, err := wordsFromBytesStrict(results)
+				if err != nil {
+					return nil, fmt.Errorf("invalid holding register response: %w", err)
+				}
 				decoded, err := decodeHoldingTagValue(tag, words)
 				if err != nil {
 					return nil, fmt.Errorf("error decoding holding registers: %w", err)
@@ -185,11 +181,7 @@ func registerDataTools(s *mcp.Server, driver Driver, writePolicy *WritePolicy) {
 					return successResult(fmt.Sprintf("Successfully wrote holding register at address %d: %d", args.Address, args.Values[0])), nil
 				}
 
-				data := make([]byte, len(args.Values)*2)
-				for i, val := range args.Values {
-					data[i*2] = byte(val >> 8)
-					data[i*2+1] = byte(val & 0xFF)
-				}
+				data := bytesFromWords(args.Values)
 
 				_, err := driver.WriteMultipleRegisters(args.Address, uint16(len(args.Values)), data)
 				if err != nil {
@@ -214,13 +206,7 @@ func registerDataTools(s *mcp.Server, driver Driver, writePolicy *WritePolicy) {
 				}
 
 				log.Printf("Writing coils: address=%d, values=%v", args.Address, args.Values)
-				byteCount := (len(args.Values) + 7) / 8
-				coilBytes := make([]byte, byteCount)
-				for i, val := range args.Values {
-					if val {
-						coilBytes[i/8] |= (1 << uint(i%8))
-					}
-				}
+				coilBytes := packedCoilsFromBools(args.Values)
 
 				_, err := driver.WriteMultipleCoils(args.Address, uint16(len(args.Values)), coilBytes)
 				if err != nil {
@@ -231,24 +217,4 @@ func registerDataTools(s *mcp.Server, driver Driver, writePolicy *WritePolicy) {
 			})
 		},
 	)
-}
-
-func wordsFromBytes(results []byte) []uint16 {
-	values := make([]uint16, len(results)/2)
-	for i := 0; i+1 < len(results); i += 2 {
-		values[i/2] = uint16(results[i])<<8 | uint16(results[i+1])
-	}
-	return values
-}
-
-func coilStatesFromBytes(results []byte, quantity uint16) []bool {
-	states := make([]bool, quantity)
-	for i := uint16(0); i < quantity; i++ {
-		byteIndex := i / 8
-		bitIndex := i % 8
-		if byteIndex < uint16(len(results)) {
-			states[i] = (results[byteIndex] & (1 << bitIndex)) != 0
-		}
-	}
-	return states
 }

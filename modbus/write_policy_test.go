@@ -57,3 +57,11 @@ func TestWritePolicyInvalidAllowlistFails(t *testing.T) {
 		t.Fatalf("expected invalid allowlist to fail")
 	}
 }
+
+func TestWritePolicyInvalidBoolFails(t *testing.T) {
+	t.Setenv(envWritesEnabled, "definitely-not-bool")
+
+	if _, err := LoadWritePolicy(nil); err == nil {
+		t.Fatalf("expected invalid writes-enabled bool to fail")
+	}
+}

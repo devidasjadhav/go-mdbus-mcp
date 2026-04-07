@@ -2,6 +2,13 @@ package modbus
 
 import "testing"
 
+func TestNewDriverNilConfigFails(t *testing.T) {
+	_, err := NewDriver(nil)
+	if err == nil {
+		t.Fatalf("expected nil config error")
+	}
+}
+
 func TestNewDriverSelectsSimonvetterForTCP(t *testing.T) {
 	d, err := NewDriver(&Config{
 		Driver:           "simonvetter",

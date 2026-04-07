@@ -37,6 +37,8 @@ The server exposes the following MCP Tools to your LLM:
 
 Ensure you have Go 1.25+ installed.
 
+Toolchain policy: this repository is pinned to Go 1.25 across local development, CI, and Docker builds.
+
 ```bash
 go build -o modbus-server .
 
@@ -166,7 +168,7 @@ To use this server natively in Claude Desktop, add the following to your `claude
 
 Detailed usage and OpenCode validation steps are documented in `HOW_TO_USE.md`.
 
-Validated test runs and outcomes are documented in `TEST_DOCUMENT.md`.
+Historical validation run notes are archived in `docs/archive/TEST_DOCUMENT.md`.
 
 Security deployment guidance is documented in `SECURITY.md`.
 

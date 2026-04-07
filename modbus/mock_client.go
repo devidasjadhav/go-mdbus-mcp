@@ -26,14 +26,9 @@ func (m *mockClient) ReadCoils(address, quantity uint16) ([]byte, error) {
 		return nil, err
 	}
 
-	byteCount := (int(quantity) + 7) / 8
-	out := make([]byte, byteCount)
-	for i := 0; i < int(quantity); i++ {
-		if m.coils[int(address)+i] {
-			out[i/8] |= 1 << uint(i%8)
-		}
-	}
-	return out, nil
+	start := int(address)
+	end := start + int(quantity)
+	return packedCoilsFromBools(m.coils[start:end]), nil
 }
 
 func (m *mockClient) ReadDiscreteInputs(address, quantity uint16) ([]byte, error) {
@@ -43,14 +38,9 @@ func (m *mockClient) ReadDiscreteInputs(address, quantity uint16) ([]byte, error
 		return nil, err
 	}
 
-	byteCount := (int(quantity) + 7) / 8
-	out := make([]byte, byteCount)
-	for i := 0; i < int(quantity); i++ {
-		if m.coils[int(address)+i] {
-			out[i/8] |= 1 << uint(i%8)
-		}
-	}
-	return out, nil
+	start := int(address)
+	end := start + int(quantity)
+	return packedCoilsFromBools(m.coils[start:end]), nil
 }
 
 func (m *mockClient) WriteSingleCoil(address, value uint16) ([]byte, error) {
@@ -72,10 +62,12 @@ func (m *mockClient) WriteMultipleCoils(address, quantity uint16, value []byte) 
 	if quantity == 0 {
 		return nil, fmt.Errorf("mock: quantity must be > 0")
 	}
-
-	for i := 0; i < int(quantity); i++ {
-		m.coils[int(address)+i] = (value[i/8] & (1 << uint(i%8))) != 0
+	if expected := (int(quantity) + 7) / 8; len(value) != expected {
+		return nil, fmt.Errorf("mock: expected %d coil data bytes, got %d", expected, len(value))
 	}
+
+	states := boolsFromPackedCoils(value, quantity)
+	copy(m.coils[int(address):int(address)+int(quantity)], states)
 
 	resp := make([]byte, 4)
 	binary.BigEndian.PutUint16(resp[0:2], address)
@@ -90,11 +82,9 @@ func (m *mockClient) ReadInputRegisters(address, quantity uint16) ([]byte, error
 		return nil, err
 	}
 
-	out := make([]byte, int(quantity)*2)
-	for i := 0; i < int(quantity); i++ {
-		binary.BigEndian.PutUint16(out[i*2:i*2+2], m.registers[int(address)+i])
-	}
-	return out, nil
+	start := int(address)
+	end := start + int(quantity)
+	return bytesFromWords(m.registers[start:end]), nil
 }
 
 func (m *mockClient) ReadHoldingRegisters(address, quantity uint16) ([]byte, error) {
@@ -104,11 +94,9 @@ func (m *mockClient) ReadHoldingRegisters(address, quantity uint16) ([]byte, err
 		return nil, err
 	}
 
-	out := make([]byte, int(quantity)*2)
-	for i := 0; i < int(quantity); i++ {
-		binary.BigEndian.PutUint16(out[i*2:i*2+2], m.registers[int(address)+i])
-	}
-	return out, nil
+	start := int(address)
+	end := start + int(quantity)
+	return bytesFromWords(m.registers[start:end]), nil
 }
 
 func (m *mockClient) WriteSingleRegister(address, value uint16) ([]byte, error) {
@@ -130,11 +118,15 @@ func (m *mockClient) WriteMultipleRegisters(address, quantity uint16, value []by
 	if err := m.validateRange(address, quantity, len(m.registers), "holding registers"); err != nil {
 		return nil, err
 	}
-	if int(quantity)*2 != len(value) {
-		return nil, fmt.Errorf("mock: expected %d data bytes, got %d", int(quantity)*2, len(value))
+	words, err := wordsFromBytesStrict(value)
+	if err != nil {
+		return nil, fmt.Errorf("mock: invalid register payload: %w", err)
 	}
-	for i := 0; i < int(quantity); i++ {
-		m.registers[int(address)+i] = binary.BigEndian.Uint16(value[i*2 : i*2+2])
+	if int(quantity) != len(words) {
+		return nil, fmt.Errorf("mock: expected %d register words, got %d", int(quantity), len(words))
+	}
+	for i := range words {
+		m.registers[int(address)+i] = words[i]
 	}
 	resp := make([]byte, 4)
 	binary.BigEndian.PutUint16(resp[0:2], address)

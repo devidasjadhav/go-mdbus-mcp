@@ -41,9 +41,15 @@ func LoadWritePolicyFromEnv() (*WritePolicy, error) {
 
 // LoadWritePolicy loads write-safety policy from env and optional overrides.
 func LoadWritePolicy(overrides *WritePolicyOverrides) (*WritePolicy, error) {
-	enabled := parseEnvBool(envWritesEnabled, false)
+	enabled := false
 	if overrides != nil && overrides.WritesEnabled != nil {
 		enabled = *overrides.WritesEnabled
+	} else {
+		v, err := parseEnvBool(envWritesEnabled, false)
+		if err != nil {
+			return nil, fmt.Errorf("invalid %s: %w", envWritesEnabled, err)
+		}
+		enabled = v
 	}
 
 	globalRaw := os.Getenv(envWriteAllowlist)
@@ -184,16 +190,16 @@ func isRangeAllowed(start uint16, end uint16, allowlist []addressRange) bool {
 	return false
 }
 
-func parseEnvBool(name string, fallback bool) bool {
+func parseEnvBool(name string, fallback bool) (bool, error) {
 	val := strings.TrimSpace(strings.ToLower(os.Getenv(name)))
 	if val == "" {
-		return fallback
+		return fallback, nil
 	}
 	parsed, err := strconv.ParseBool(val)
 	if err != nil {
-		return fallback
+		return false, err
 	}
-	return parsed
+	return parsed, nil
 }
 
 func parseUint16(raw string) (uint16, error) {

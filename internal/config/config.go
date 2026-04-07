@@ -19,6 +19,7 @@ var validDrivers = map[string]bool{"goburrow": true, "simonvetter": true}
 var validModes = map[string]bool{"tcp": true, "rtu": true}
 var validParities = map[string]bool{"N": true, "E": true, "O": true}
 
+// AppConfig is the raw config-file representation (YAML/JSON).
 type AppConfig struct {
 	ModbusDriver        *string `json:"modbus_driver" yaml:"modbus_driver"`
 	ModbusMode          *string `json:"modbus_mode" yaml:"modbus_mode"`
@@ -46,6 +47,7 @@ type AppConfig struct {
 	TagMapCSV   *string            `json:"tag_map_csv" yaml:"tag_map_csv"`
 }
 
+// WritePolicyConfig declares optional write-safety policy overrides from config.
 type WritePolicyConfig struct {
 	WritesEnabled         *bool   `json:"writes_enabled" yaml:"writes_enabled"`
 	WriteAllowlist        *string `json:"write_allowlist" yaml:"write_allowlist"`
@@ -53,6 +55,7 @@ type WritePolicyConfig struct {
 	CoilWriteAllowlist    *string `json:"coil_write_allowlist" yaml:"coil_write_allowlist"`
 }
 
+// TagConfig defines one semantic Modbus tag from config.
 type TagConfig struct {
 	Name        string   `json:"name" yaml:"name"`
 	Kind        string   `json:"kind" yaml:"kind"`
@@ -68,6 +71,7 @@ type TagConfig struct {
 	Description string   `json:"description,omitempty" yaml:"description,omitempty"`
 }
 
+// RuntimeOptions is the fully-resolved runtime configuration after merge.
 type RuntimeOptions struct {
 	ModbusDriver        string
 	ModbusMode          string
@@ -91,6 +95,7 @@ type RuntimeOptions struct {
 	Transport           string
 }
 
+// LoadAppConfig loads YAML/JSON app configuration from disk.
 func LoadAppConfig(path string) (*AppConfig, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -119,6 +124,7 @@ func LoadAppConfig(path string) (*AppConfig, error) {
 	return &cfg, nil
 }
 
+// ApplyConfigOverrides applies config-file values unless a CLI flag explicitly set them.
 func ApplyConfigOverrides(cfg *AppConfig, setFlags map[string]bool, opts *RuntimeOptions) error {
 	if cfg == nil || opts == nil {
 		return nil
@@ -205,6 +211,7 @@ func ApplyConfigOverrides(cfg *AppConfig, setFlags map[string]bool, opts *Runtim
 	return nil
 }
 
+// ValidateRuntimeOptions normalizes and validates resolved runtime settings.
 func ValidateRuntimeOptions(opts *RuntimeOptions) error {
 	if opts == nil {
 		return nil
@@ -258,6 +265,7 @@ func ValidateRuntimeOptions(opts *RuntimeOptions) error {
 	return nil
 }
 
+// ToWritePolicyOverrides maps config-file write policy fields into modbus policy overrides.
 func ToWritePolicyOverrides(cfg *AppConfig) *modbus.WritePolicyOverrides {
 	if cfg == nil || cfg.WritePolicy == nil {
 		return nil
@@ -270,6 +278,7 @@ func ToWritePolicyOverrides(cfg *AppConfig) *modbus.WritePolicyOverrides {
 	}
 }
 
+// ToTagMap builds a validated TagMap from inline tags and/or a CSV mapping.
 func ToTagMap(cfg *AppConfig, csvPath string) (*modbus.TagMap, error) {
 	if strings.TrimSpace(csvPath) != "" {
 		tags, err := loadTagsFromCSV(csvPath)

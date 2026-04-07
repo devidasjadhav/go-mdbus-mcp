@@ -222,7 +222,7 @@ func (d *simonvetterDriver) ReadHoldingRegisters(address, quantity uint16) ([]by
 	if err != nil {
 		return nil, err
 	}
-	return regsToBytes(regs), nil
+	return bytesFromWords(regs), nil
 }
 
 func (d *simonvetterDriver) ReadInputRegisters(address, quantity uint16) ([]byte, error) {
@@ -230,7 +230,7 @@ func (d *simonvetterDriver) ReadInputRegisters(address, quantity uint16) ([]byte
 	if err != nil {
 		return nil, err
 	}
-	return regsToBytes(regs), nil
+	return bytesFromWords(regs), nil
 }
 
 func (d *simonvetterDriver) ReadCoils(address, quantity uint16) ([]byte, error) {
@@ -238,7 +238,7 @@ func (d *simonvetterDriver) ReadCoils(address, quantity uint16) ([]byte, error) 
 	if err != nil {
 		return nil, err
 	}
-	return boolsToPackedBytes(values), nil
+	return packedCoilsFromBools(values), nil
 }
 
 func (d *simonvetterDriver) ReadDiscreteInputs(address, quantity uint16) ([]byte, error) {
@@ -246,7 +246,7 @@ func (d *simonvetterDriver) ReadDiscreteInputs(address, quantity uint16) ([]byte
 	if err != nil {
 		return nil, err
 	}
-	return boolsToPackedBytes(values), nil
+	return packedCoilsFromBools(values), nil
 }
 
 func (d *simonvetterDriver) WriteSingleRegister(address, value uint16) ([]byte, error) {
@@ -260,12 +260,12 @@ func (d *simonvetterDriver) WriteSingleRegister(address, value uint16) ([]byte, 
 }
 
 func (d *simonvetterDriver) WriteMultipleRegisters(address, quantity uint16, value []byte) ([]byte, error) {
-	if int(quantity)*2 != len(value) {
-		return nil, fmt.Errorf("invalid register payload length: got %d, expected %d", len(value), int(quantity)*2)
+	regs, err := wordsFromBytesStrict(value)
+	if err != nil {
+		return nil, fmt.Errorf("invalid register payload: %w", err)
 	}
-	regs := make([]uint16, quantity)
-	for i := range regs {
-		regs[i] = binary.BigEndian.Uint16(value[i*2 : i*2+2])
+	if len(regs) != int(quantity) {
+		return nil, fmt.Errorf("invalid register payload length: got %d words, expected %d", len(regs), int(quantity))
 	}
 	if err := d.client.WriteRegisters(address, regs); err != nil {
 		return nil, err
@@ -277,10 +277,15 @@ func (d *simonvetterDriver) WriteMultipleRegisters(address, quantity uint16, val
 }
 
 func (d *simonvetterDriver) WriteMultipleCoils(address, quantity uint16, value []byte) ([]byte, error) {
-	coils := make([]bool, quantity)
-	for i := 0; i < int(quantity); i++ {
-		coils[i] = (value[i/8] & (1 << uint(i%8))) != 0
+	if quantity == 0 {
+		return nil, fmt.Errorf("quantity must be greater than 0")
 	}
+	expectedBytes := int((quantity + 7) / 8)
+	if len(value) != expectedBytes {
+		return nil, fmt.Errorf("invalid coil payload length: got %d, expected %d", len(value), expectedBytes)
+	}
+
+	coils := boolsFromPackedCoils(value, quantity)
 	if err := d.client.WriteCoils(address, coils); err != nil {
 		return nil, err
 	}
@@ -327,25 +332,6 @@ func normalizeDriverError(err error) error {
 	}
 	category := errorCategory(err)
 	return fmt.Errorf("%s: %w", category, err)
-}
-
-func regsToBytes(regs []uint16) []byte {
-	out := make([]byte, len(regs)*2)
-	for i, v := range regs {
-		binary.BigEndian.PutUint16(out[i*2:i*2+2], v)
-	}
-	return out
-}
-
-func boolsToPackedBytes(values []bool) []byte {
-	byteCount := (len(values) + 7) / 8
-	out := make([]byte, byteCount)
-	for i, v := range values {
-		if v {
-			out[i/8] |= 1 << uint(i%8)
-		}
-	}
-	return out
 }
 
 func maxInt(v int, fallback int) int {

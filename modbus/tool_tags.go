@@ -43,9 +43,9 @@ func registerTagTools(s *mcp.Server, driver Driver, writePolicy *WritePolicy, ta
 					if err != nil {
 						return nil, fmt.Errorf("error reading tag %q: %w", tag.Name, err)
 					}
-					values := make([]uint16, len(results)/2)
-					for i := 0; i < len(results); i += 2 {
-						values[i/2] = uint16(results[i])<<8 | uint16(results[i+1])
+					values, err := wordsFromBytesStrict(results)
+					if err != nil {
+						return nil, fmt.Errorf("invalid holding-register response for tag %q: %w", tag.Name, err)
 					}
 
 					decoded, err := decodeHoldingTagValue(tag, values)
@@ -73,14 +73,7 @@ func registerTagTools(s *mcp.Server, driver Driver, writePolicy *WritePolicy, ta
 					if err != nil {
 						return nil, fmt.Errorf("error reading tag %q: %w", tag.Name, err)
 					}
-					values := make([]bool, tag.Quantity)
-					for i := uint16(0); i < tag.Quantity; i++ {
-						byteIndex := i / 8
-						bitIndex := i % 8
-						if byteIndex < uint16(len(results)) {
-							values[i] = (results[byteIndex] & (1 << bitIndex)) != 0
-						}
-					}
+					values := boolsFromPackedCoils(results, tag.Quantity)
 					payload := map[string]any{
 						"name":          tag.Name,
 						"kind":          tag.Kind,
@@ -163,11 +156,7 @@ func registerTagTools(s *mcp.Server, driver Driver, writePolicy *WritePolicy, ta
 						return successResult(fmt.Sprintf("Tag %s written to %d", tag.Name, holdingValues[0])), nil
 					}
 
-					data := make([]byte, len(holdingValues)*2)
-					for i, val := range holdingValues {
-						data[i*2] = byte(val >> 8)
-						data[i*2+1] = byte(val & 0xFF)
-					}
+					data := bytesFromWords(holdingValues)
 					_, err := driver.WriteMultipleRegisters(tag.Address, uint16(len(holdingValues)), data)
 					if err != nil {
 						return nil, fmt.Errorf("error writing tag %q: %w", tag.Name, err)
@@ -206,13 +195,7 @@ func registerTagTools(s *mcp.Server, driver Driver, writePolicy *WritePolicy, ta
 				}
 
 				return executeTool(ctx, driver, targetSlave, false, func() (*mcp.CallToolResult, error) {
-					byteCount := (len(coilValues) + 7) / 8
-					coilBytes := make([]byte, byteCount)
-					for i, val := range coilValues {
-						if val {
-							coilBytes[i/8] |= (1 << uint(i%8))
-						}
-					}
+					coilBytes := packedCoilsFromBools(coilValues)
 					_, err := driver.WriteMultipleCoils(tag.Address, uint16(len(coilValues)), coilBytes)
 					if err != nil {
 						return nil, fmt.Errorf("error writing tag %q: %w", tag.Name, err)
