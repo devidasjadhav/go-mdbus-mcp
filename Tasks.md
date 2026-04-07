@@ -76,10 +76,10 @@ Commit target:
 
 Goal: finalize migration based on test outcomes.
 
-- [ ] Run parity matrix and compare reliability/perf between drivers.
-- [ ] Decide default driver (`goburrow` or `simonvetter`).
-- [ ] Deprecate/remove temporary compatibility code if no longer needed.
-- [ ] Publish migration notes and compatibility matrix.
+- [x] Run parity matrix and compare reliability/perf between drivers.
+- [x] Decide default driver (`goburrow` or `simonvetter`).
+- [x] Deprecate/remove temporary compatibility code if no longer needed.
+- [x] Publish migration notes and compatibility matrix.
 
 Commit target:
 

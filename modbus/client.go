@@ -377,8 +377,3 @@ func containsAny(msg string, subs ...string) bool {
 	}
 	return false
 }
-
-// Ptr is a helper function to get a pointer to a value
-func Ptr[T any](v T) *T {
-	return &v
-}

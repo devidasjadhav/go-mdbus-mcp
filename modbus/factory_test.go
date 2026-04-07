@@ -20,6 +20,23 @@ func TestNewDriverSelectsSimonvetterForTCP(t *testing.T) {
 	}
 }
 
+func TestNewDriverDefaultsToGoburrow(t *testing.T) {
+	d, err := NewDriver(&Config{
+		Mode:             "tcp",
+		ModbusIP:         "127.0.0.1",
+		ModbusPort:       502,
+		RetryAttempts:    1,
+		CircuitTripAfter: 3,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if _, ok := d.(*ModbusClient); !ok {
+		t.Fatalf("expected goburrow driver by default, got %T", d)
+	}
+}
+
 func TestNewDriverFallsBackToMockForMockMode(t *testing.T) {
 	d, err := NewDriver(&Config{
 		Driver:        "simonvetter",
