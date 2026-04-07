@@ -155,6 +155,22 @@ Suggested competitors/adapters:
    - PR: Stage 1 + selected Stage 2
    - Nightly: full Stage 2 + Stage 3 + RTU lane (if hardware available)
 
+## Current Tooling
+
+- Stage 1 harness: `go test -v . -run TestStage1MatrixMockMode`
+- Stage 2 harness: `go test -v . -run TestStage2AdvancedMatrixMockMode`
+- Stage 3 harness: `STAGE3_STRESS=1 go test -v . -run TestStage3StressHarness`
+- Report generation:
+
+```bash
+go run ./tools/reportgen \
+  -server go-mdbus-mcp \
+  -stage1 /path/to/stage1-results.json \
+  -stage2 /path/to/stage2-results.json \
+  -stage3 /path/to/stage3-results.json \
+  -out /path/to/comparison-report.md
+```
+
 ## Immediate Next Steps
 
 1. Implement Stage 1 harness first (fastest ROI).
