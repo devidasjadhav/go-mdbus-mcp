@@ -194,6 +194,28 @@ func TestValidateRuntimeOptionsAcceptsValidRTU(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected valid RTU options, got: %v", err)
 	}
+	if opts.ModbusConnectionPoolSize != 1 {
+		t.Fatalf("expected default pool size 1, got %d", opts.ModbusConnectionPoolSize)
+	}
+}
+
+func TestApplyConfigOverridesConnectionPoolSize(t *testing.T) {
+	cfg := &AppConfig{ModbusConnectionPoolSize: ptr(4)}
+	opts := &RuntimeOptions{ModbusConnectionPoolSize: 1}
+	if err := ApplyConfigOverrides(cfg, map[string]bool{}, opts); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if opts.ModbusConnectionPoolSize != 4 {
+		t.Fatalf("expected pool size override to 4, got %d", opts.ModbusConnectionPoolSize)
+	}
+
+	opts = &RuntimeOptions{ModbusConnectionPoolSize: 1}
+	if err := ApplyConfigOverrides(cfg, map[string]bool{"modbus-connection-pool-size": true}, opts); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if opts.ModbusConnectionPoolSize != 1 {
+		t.Fatalf("expected cli flag precedence for pool size, got %d", opts.ModbusConnectionPoolSize)
+	}
 }
 
 func ptr[T any](v T) *T {

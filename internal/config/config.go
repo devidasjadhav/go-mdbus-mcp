@@ -21,27 +21,28 @@ var validParities = map[string]bool{"N": true, "E": true, "O": true}
 
 // AppConfig is the raw config-file representation (YAML/JSON).
 type AppConfig struct {
-	ModbusDriver         *string `json:"modbus_driver" yaml:"modbus_driver"`
-	ModbusMode           *string `json:"modbus_mode" yaml:"modbus_mode"`
-	SerialPort           *string `json:"serial_port" yaml:"serial_port"`
-	BaudRate             *int    `json:"baud_rate" yaml:"baud_rate"`
-	DataBits             *int    `json:"data_bits" yaml:"data_bits"`
-	Parity               *string `json:"parity" yaml:"parity"`
-	StopBits             *int    `json:"stop_bits" yaml:"stop_bits"`
-	ModbusIP             *string `json:"modbus_ip" yaml:"modbus_ip"`
-	ModbusPort           *int    `json:"modbus_port" yaml:"modbus_port"`
-	ModbusTimeout        *string `json:"modbus_timeout" yaml:"modbus_timeout"`
-	ModbusIdleTimeout    *string `json:"modbus_idle_timeout" yaml:"modbus_idle_timeout"`
-	ModbusRetryAttempts  *int    `json:"modbus_retry_attempts" yaml:"modbus_retry_attempts"`
-	ModbusRetryBackoff   *string `json:"modbus_retry_backoff" yaml:"modbus_retry_backoff"`
-	ModbusRetryOnWrite   *bool   `json:"modbus_retry_on_write" yaml:"modbus_retry_on_write"`
-	ModbusReconnectPerOp *bool   `json:"modbus_reconnect_per_operation" yaml:"modbus_reconnect_per_operation"`
-	CircuitTripAfter     *int    `json:"modbus_circuit_trip_after" yaml:"modbus_circuit_trip_after"`
-	CircuitOpenFor       *string `json:"modbus_circuit_open_for" yaml:"modbus_circuit_open_for"`
-	Transport            *string `json:"transport" yaml:"transport"`
-	MockMode             *bool   `json:"mock_mode" yaml:"mock_mode"`
-	MockRegisters        *int    `json:"mock_registers" yaml:"mock_registers"`
-	MockCoils            *int    `json:"mock_coils" yaml:"mock_coils"`
+	ModbusDriver             *string `json:"modbus_driver" yaml:"modbus_driver"`
+	ModbusMode               *string `json:"modbus_mode" yaml:"modbus_mode"`
+	SerialPort               *string `json:"serial_port" yaml:"serial_port"`
+	BaudRate                 *int    `json:"baud_rate" yaml:"baud_rate"`
+	DataBits                 *int    `json:"data_bits" yaml:"data_bits"`
+	Parity                   *string `json:"parity" yaml:"parity"`
+	StopBits                 *int    `json:"stop_bits" yaml:"stop_bits"`
+	ModbusIP                 *string `json:"modbus_ip" yaml:"modbus_ip"`
+	ModbusPort               *int    `json:"modbus_port" yaml:"modbus_port"`
+	ModbusTimeout            *string `json:"modbus_timeout" yaml:"modbus_timeout"`
+	ModbusIdleTimeout        *string `json:"modbus_idle_timeout" yaml:"modbus_idle_timeout"`
+	ModbusRetryAttempts      *int    `json:"modbus_retry_attempts" yaml:"modbus_retry_attempts"`
+	ModbusRetryBackoff       *string `json:"modbus_retry_backoff" yaml:"modbus_retry_backoff"`
+	ModbusRetryOnWrite       *bool   `json:"modbus_retry_on_write" yaml:"modbus_retry_on_write"`
+	ModbusReconnectPerOp     *bool   `json:"modbus_reconnect_per_operation" yaml:"modbus_reconnect_per_operation"`
+	ModbusConnectionPoolSize *int    `json:"modbus_connection_pool_size" yaml:"modbus_connection_pool_size"`
+	CircuitTripAfter         *int    `json:"modbus_circuit_trip_after" yaml:"modbus_circuit_trip_after"`
+	CircuitOpenFor           *string `json:"modbus_circuit_open_for" yaml:"modbus_circuit_open_for"`
+	Transport                *string `json:"transport" yaml:"transport"`
+	MockMode                 *bool   `json:"mock_mode" yaml:"mock_mode"`
+	MockRegisters            *int    `json:"mock_registers" yaml:"mock_registers"`
+	MockCoils                *int    `json:"mock_coils" yaml:"mock_coils"`
 
 	WritePolicy *WritePolicyConfig `json:"write_policy" yaml:"write_policy"`
 	Tags        []TagConfig        `json:"tags" yaml:"tags"`
@@ -74,27 +75,28 @@ type TagConfig struct {
 
 // RuntimeOptions is the fully-resolved runtime configuration after merge.
 type RuntimeOptions struct {
-	ModbusDriver         string
-	ModbusMode           string
-	SerialPort           string
-	BaudRate             int
-	DataBits             int
-	Parity               string
-	StopBits             int
-	ModbusIP             string
-	ModbusPort           int
-	ModbusTimeout        time.Duration
-	ModbusIdleTimeout    time.Duration
-	ModbusRetryAttempts  int
-	ModbusRetryBackoff   time.Duration
-	ModbusRetryOnWrite   bool
-	ModbusReconnectPerOp bool
-	CircuitTripAfter     int
-	CircuitOpenFor       time.Duration
-	MockMode             bool
-	MockRegisters        int
-	MockCoils            int
-	Transport            string
+	ModbusDriver             string
+	ModbusMode               string
+	SerialPort               string
+	BaudRate                 int
+	DataBits                 int
+	Parity                   string
+	StopBits                 int
+	ModbusIP                 string
+	ModbusPort               int
+	ModbusTimeout            time.Duration
+	ModbusIdleTimeout        time.Duration
+	ModbusRetryAttempts      int
+	ModbusRetryBackoff       time.Duration
+	ModbusRetryOnWrite       bool
+	ModbusReconnectPerOp     bool
+	ModbusConnectionPoolSize int
+	CircuitTripAfter         int
+	CircuitOpenFor           time.Duration
+	MockMode                 bool
+	MockRegisters            int
+	MockCoils                int
+	Transport                string
 }
 
 // LoadAppConfig loads YAML/JSON app configuration from disk.
@@ -167,6 +169,9 @@ func ApplyConfigOverrides(cfg *AppConfig, setFlags map[string]bool, opts *Runtim
 	}
 	if cfg.ModbusReconnectPerOp != nil && !setFlags["modbus-reconnect-per-operation"] {
 		opts.ModbusReconnectPerOp = *cfg.ModbusReconnectPerOp
+	}
+	if cfg.ModbusConnectionPoolSize != nil && !setFlags["modbus-connection-pool-size"] {
+		opts.ModbusConnectionPoolSize = *cfg.ModbusConnectionPoolSize
 	}
 	if cfg.CircuitTripAfter != nil && !setFlags["modbus-circuit-trip-after"] {
 		opts.CircuitTripAfter = *cfg.CircuitTripAfter
@@ -261,6 +266,9 @@ func ValidateRuntimeOptions(opts *RuntimeOptions) error {
 	}
 	if opts.BaudRate <= 0 {
 		return fmt.Errorf("baud rate must be greater than 0")
+	}
+	if opts.ModbusConnectionPoolSize <= 0 {
+		opts.ModbusConnectionPoolSize = 1
 	}
 
 	if opts.ModbusMode == "rtu" && strings.TrimSpace(opts.SerialPort) == "" {

@@ -68,6 +68,39 @@ func TestNewDriverRTUMissingSerialPortFails(t *testing.T) {
 	}
 }
 
+func TestNewDriverTCPPoolReturnsPooledDriver(t *testing.T) {
+	d, err := NewDriver(&Config{Mode: "tcp", ModbusIP: "127.0.0.1", ModbusPort: 1502, ConnectionPoolSize: 2})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer d.Close()
+
+	if _, ok := d.(interface{ SelectDriverForOp(bool) Driver }); !ok {
+		t.Fatalf("expected pooled driver implementation")
+	}
+}
+
+func TestNewDriverRTUForcesSingleConnection(t *testing.T) {
+	d, err := NewDriver(&Config{Mode: "rtu", SerialPort: "/dev/ttyS0", ConnectionPoolSize: 3, Driver: "simonvetter"})
+	if err != nil {
+		t.Fatalf("unexpected error creating rtu simonvetter driver: %v", err)
+	}
+	defer d.Close()
+
+	if _, ok := d.(interface{ SelectDriverForOp(bool) Driver }); ok {
+		t.Fatalf("did not expect pooled driver for RTU")
+	}
+
+	d2, err := NewDriver(&Config{Mode: "rtu", SerialPort: "/dev/ttyS0", ConnectionPoolSize: 3, Driver: "goburrow"})
+	if err != nil {
+		t.Fatalf("unexpected error creating rtu goburrow driver: %v", err)
+	}
+	defer d2.Close()
+	if _, ok := d2.(interface{ SelectDriverForOp(bool) Driver }); ok {
+		t.Fatalf("did not expect pooled driver for RTU goburrow")
+	}
+}
+
 func TestNormalizeDriverErrorCategories(t *testing.T) {
 	tests := []struct {
 		name string

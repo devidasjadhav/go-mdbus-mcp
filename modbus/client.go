@@ -19,7 +19,8 @@ type ModbusClient struct {
 	client  modbus.Client
 	handler *modbus.TCPClientHandler
 	config  *Config
-	mu      sync.Mutex // Ensures thread safety for concurrent tool calls
+	connMu  sync.Mutex
+	statsMu sync.Mutex
 	stats   clientStats
 }
 
@@ -68,6 +69,7 @@ type Config struct {
 	RetryOnWrite             bool
 	ReconnectPerOp           bool
 	ReconnectPerOpConfigured bool
+	ConnectionPoolSize       int
 	CircuitTripAfter         int
 	CircuitOpenFor           time.Duration
 	UseMock                  bool
@@ -142,8 +144,8 @@ func newTCPHandler(config *Config, slaveID uint8) *modbus.TCPClientHandler {
 
 // Close closes the connection to the Modbus server
 func (mc *ModbusClient) Close() error {
-	mc.mu.Lock()
-	defer mc.mu.Unlock()
+	mc.connMu.Lock()
+	defer mc.connMu.Unlock()
 	if mc.config != nil && mc.config.UseMock {
 		return nil
 	}
@@ -204,9 +206,6 @@ func (mc *ModbusClient) WriteMultipleCoils(address, quantity uint16, value []byt
 // gateways/PLCs. When ReconnectPerOp is disabled, it reuses the current connection and
 // reconnects only on retry attempts after transient failures.
 func (mc *ModbusClient) Execute(ctx context.Context, slaveID uint8, allowRetry bool, operation func() (*mcp.CallToolResult, error)) (*mcp.CallToolResult, error) {
-	mc.mu.Lock()
-	defer mc.mu.Unlock()
-
 	if mc.config != nil && mc.config.UseMock {
 		if err := ctx.Err(); err != nil {
 			return nil, fmt.Errorf("operation canceled: %w", err)
@@ -220,9 +219,12 @@ func (mc *ModbusClient) Execute(ctx context.Context, slaveID uint8, allowRetry b
 		return res, nil
 	}
 
+	mc.connMu.Lock()
+	defer mc.connMu.Unlock()
+
 	now := time.Now()
-	if !mc.stats.CircuitOpenUntil.IsZero() && now.Before(mc.stats.CircuitOpenUntil) {
-		return nil, fmt.Errorf("modbus circuit open until %s after repeated failures", mc.stats.CircuitOpenUntil.Format(time.RFC3339))
+	if openUntil, ok := mc.circuitOpenUntil(now); ok {
+		return nil, fmt.Errorf("modbus circuit open until %s after repeated failures", openUntil.Format(time.RFC3339))
 	}
 
 	attempts := 1
@@ -256,20 +258,20 @@ func (mc *ModbusClient) Execute(ctx context.Context, slaveID uint8, allowRetry b
 					mc.recordFailure(lastErr)
 					return nil, lastErr
 				}
-				mc.stats.TotalRetries++
+				mc.incrementRetries()
 				backoff := mc.backoffForAttempt(attempt)
 				log.Printf("modbus: transient error (attempt %d/%d), retrying in %s: %v", attempt, attempts, backoff, lastErr)
 
-				mc.mu.Unlock()
+				mc.connMu.Unlock()
 				timer := time.NewTimer(backoff)
 				select {
 				case <-ctx.Done():
 					timer.Stop()
-					mc.mu.Lock()
+					mc.connMu.Lock()
 					return nil, fmt.Errorf("operation canceled during retry backoff: %w", ctx.Err())
 				case <-timer.C:
 				}
-				mc.mu.Lock()
+				mc.connMu.Lock()
 				continue
 			}
 		} else {
@@ -294,20 +296,20 @@ func (mc *ModbusClient) Execute(ctx context.Context, slaveID uint8, allowRetry b
 			mc.client = nil
 		}
 
-		mc.stats.TotalRetries++
+		mc.incrementRetries()
 		backoff := mc.backoffForAttempt(attempt)
 		log.Printf("modbus: transient error (attempt %d/%d), retrying in %s: %v", attempt, attempts, backoff, lastErr)
 
-		mc.mu.Unlock()
+		mc.connMu.Unlock()
 		timer := time.NewTimer(backoff)
 		select {
 		case <-ctx.Done():
 			timer.Stop()
-			mc.mu.Lock()
+			mc.connMu.Lock()
 			return nil, fmt.Errorf("operation canceled during retry backoff: %w", ctx.Err())
 		case <-timer.C:
 		}
-		mc.mu.Lock()
+		mc.connMu.Lock()
 	}
 
 	mc.recordFailure(lastErr)
@@ -316,8 +318,8 @@ func (mc *ModbusClient) Execute(ctx context.Context, slaveID uint8, allowRetry b
 
 // Status returns lifecycle and retry state for diagnostics.
 func (mc *ModbusClient) Status() ClientStatus {
-	mc.mu.Lock()
-	defer mc.mu.Unlock()
+	mc.statsMu.Lock()
+	defer mc.statsMu.Unlock()
 
 	status := ClientStatus{
 		Driver:              mc.DriverName(),
@@ -355,12 +357,16 @@ func (mc *ModbusClient) backoffForAttempt(attempt int) time.Duration {
 }
 
 func (mc *ModbusClient) recordSuccess() {
+	mc.statsMu.Lock()
+	defer mc.statsMu.Unlock()
 	mc.stats.TotalOperations++
 	mc.stats.ConsecutiveFailures = 0
 	mc.stats.CircuitOpenUntil = time.Time{}
 }
 
 func (mc *ModbusClient) recordFailure(err error) {
+	mc.statsMu.Lock()
+	defer mc.statsMu.Unlock()
 	mc.stats.TotalOperations++
 	mc.stats.TotalFailures++
 	mc.stats.ConsecutiveFailures++
@@ -370,6 +376,21 @@ func (mc *ModbusClient) recordFailure(err error) {
 	if int(mc.stats.ConsecutiveFailures) >= mc.config.CircuitTripAfter {
 		mc.stats.CircuitOpenUntil = time.Now().Add(mc.config.CircuitOpenFor)
 	}
+}
+
+func (mc *ModbusClient) incrementRetries() {
+	mc.statsMu.Lock()
+	defer mc.statsMu.Unlock()
+	mc.stats.TotalRetries++
+}
+
+func (mc *ModbusClient) circuitOpenUntil(now time.Time) (time.Time, bool) {
+	mc.statsMu.Lock()
+	defer mc.statsMu.Unlock()
+	if mc.stats.CircuitOpenUntil.IsZero() || !now.Before(mc.stats.CircuitOpenUntil) {
+		return time.Time{}, false
+	}
+	return mc.stats.CircuitOpenUntil, true
 }
 
 func shouldRetryError(err error) bool {

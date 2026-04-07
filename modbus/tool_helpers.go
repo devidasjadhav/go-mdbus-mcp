@@ -8,21 +8,34 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
+type driverSelector interface {
+	SelectDriverForOp(allowRetry bool) Driver
+}
+
 // executeTool is a helper to run thread-safe operations on the Modbus client
 // and handle any protocol errors.
-func executeTool(ctx context.Context, driver Driver, slaveID *uint8, allowRetry bool, operation func() (*mcp.CallToolResult, error)) (*mcp.CallToolResult, any, error) {
+func executeTool(ctx context.Context, driver Driver, slaveID *uint8, allowRetry bool, operation func(active Driver) (*mcp.CallToolResult, error)) (*mcp.CallToolResult, any, error) {
 	targetSlaveID := uint8(1)
 	if slaveID != nil {
 		targetSlaveID = *slaveID
 	}
 
+	runDriver := driver
+	if selector, ok := driver.(driverSelector); ok {
+		if selected := selector.SelectDriverForOp(allowRetry); selected != nil {
+			runDriver = selected
+		}
+	}
+
 	start := time.Now()
-	res, err := driver.Execute(ctx, targetSlaveID, allowRetry, operation)
+	res, err := runDriver.Execute(ctx, targetSlaveID, allowRetry, func() (*mcp.CallToolResult, error) {
+		return operation(runDriver)
+	})
 	elapsed := time.Since(start)
 	if err != nil {
-		log.Printf("modbus op failed driver=%s mode=%s slave_id=%d allow_retry=%t duration=%s err=%v", driver.DriverName(), driver.TransportMode(), targetSlaveID, allowRetry, elapsed, err)
+		log.Printf("modbus op failed driver=%s mode=%s slave_id=%d allow_retry=%t duration=%s err=%v", runDriver.DriverName(), runDriver.TransportMode(), targetSlaveID, allowRetry, elapsed, err)
 	} else {
-		log.Printf("modbus op success driver=%s mode=%s slave_id=%d allow_retry=%t duration=%s", driver.DriverName(), driver.TransportMode(), targetSlaveID, allowRetry, elapsed)
+		log.Printf("modbus op success driver=%s mode=%s slave_id=%d allow_retry=%t duration=%s", runDriver.DriverName(), runDriver.TransportMode(), targetSlaveID, allowRetry, elapsed)
 	}
 	if err != nil {
 		// As per the official SDK docs, we return formatting errors directly inside CallToolResult

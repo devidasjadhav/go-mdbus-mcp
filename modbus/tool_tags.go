@@ -36,10 +36,10 @@ func registerTagTools(s *mcp.Server, driver Driver, writePolicy *WritePolicy, ta
 			}
 
 			targetSlave := resolveSlaveID(args.SlaveID, tag.SlaveID)
-			return executeTool(ctx, driver, targetSlave, true, func() (*mcp.CallToolResult, error) {
+			return executeTool(ctx, driver, targetSlave, true, func(d Driver) (*mcp.CallToolResult, error) {
 				switch tag.Kind {
 				case TagKindHolding:
-					results, err := driver.ReadHoldingRegisters(tag.Address, tag.Quantity)
+					results, err := d.ReadHoldingRegisters(tag.Address, tag.Quantity)
 					if err != nil {
 						return nil, fmt.Errorf("error reading tag %q: %w", tag.Name, err)
 					}
@@ -69,7 +69,7 @@ func registerTagTools(s *mcp.Server, driver Driver, writePolicy *WritePolicy, ta
 					return successResult(string(raw)), nil
 
 				case TagKindCoil:
-					results, err := driver.ReadCoils(tag.Address, tag.Quantity)
+					results, err := d.ReadCoils(tag.Address, tag.Quantity)
 					if err != nil {
 						return nil, fmt.Errorf("error reading tag %q: %w", tag.Name, err)
 					}
@@ -147,9 +147,9 @@ func registerTagTools(s *mcp.Server, driver Driver, writePolicy *WritePolicy, ta
 					return errorResult(err.Error()), nil, nil
 				}
 
-				return executeTool(ctx, driver, targetSlave, false, func() (*mcp.CallToolResult, error) {
+				return executeTool(ctx, driver, targetSlave, false, func(d Driver) (*mcp.CallToolResult, error) {
 					if len(holdingValues) == 1 {
-						_, err := driver.WriteSingleRegister(tag.Address, holdingValues[0])
+						_, err := d.WriteSingleRegister(tag.Address, holdingValues[0])
 						if err != nil {
 							return nil, fmt.Errorf("error writing tag %q: %w", tag.Name, err)
 						}
@@ -157,7 +157,7 @@ func registerTagTools(s *mcp.Server, driver Driver, writePolicy *WritePolicy, ta
 					}
 
 					data := bytesFromWords(holdingValues)
-					_, err := driver.WriteMultipleRegisters(tag.Address, uint16(len(holdingValues)), data)
+					_, err := d.WriteMultipleRegisters(tag.Address, uint16(len(holdingValues)), data)
 					if err != nil {
 						return nil, fmt.Errorf("error writing tag %q: %w", tag.Name, err)
 					}
@@ -194,9 +194,9 @@ func registerTagTools(s *mcp.Server, driver Driver, writePolicy *WritePolicy, ta
 					return errorResult(err.Error()), nil, nil
 				}
 
-				return executeTool(ctx, driver, targetSlave, false, func() (*mcp.CallToolResult, error) {
+				return executeTool(ctx, driver, targetSlave, false, func(d Driver) (*mcp.CallToolResult, error) {
 					coilBytes := packedCoilsFromBools(coilValues)
-					_, err := driver.WriteMultipleCoils(tag.Address, uint16(len(coilValues)), coilBytes)
+					_, err := d.WriteMultipleCoils(tag.Address, uint16(len(coilValues)), coilBytes)
 					if err != nil {
 						return nil, fmt.Errorf("error writing tag %q: %w", tag.Name, err)
 					}

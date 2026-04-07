@@ -22,6 +22,7 @@ Write policy has an additional layer:
 - `--modbus-timeout`, `--modbus-idle-timeout`
 - `--modbus-retry-attempts`, `--modbus-retry-backoff`, `--modbus-retry-on-write`
 - `--modbus-reconnect-per-operation`
+- `--modbus-connection-pool-size`
 - `--modbus-circuit-trip-after`, `--modbus-circuit-open-for`
 - `--mock-mode`, `--mock-registers`, `--mock-coils`
 
@@ -40,6 +41,7 @@ modbus_retry_attempts: 3
 modbus_retry_backoff: 150ms
 modbus_retry_on_write: false
 modbus_reconnect_per_operation: true
+modbus_connection_pool_size: 1
 modbus_circuit_trip_after: 3
 modbus_circuit_open_for: 2s
 
@@ -66,3 +68,4 @@ write_policy:
 - `modbus_retry_on_write` can retry mutating operations and may not be safe for all PLC workflows.
 - Prefer `modbus_retry_on_write: false` unless operations are idempotent and process-safe.
 - `modbus_reconnect_per_operation: true` is safest for unstable networks; set to `false` to reuse TCP connections and reduce reconnect overhead.
+- `modbus_connection_pool_size` applies to TCP mode; reads can load-balance across pooled connections while writes remain on the primary lane.

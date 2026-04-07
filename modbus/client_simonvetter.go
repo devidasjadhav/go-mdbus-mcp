@@ -14,10 +14,11 @@ import (
 )
 
 type simonvetterDriver struct {
-	mu     sync.Mutex
-	config *Config
-	client *svmodbus.ModbusClient
-	stats  clientStats
+	connMu  sync.Mutex
+	statsMu sync.Mutex
+	config  *Config
+	client  *svmodbus.ModbusClient
+	stats   clientStats
 }
 
 func (d *simonvetterDriver) DriverName() string {
@@ -56,12 +57,12 @@ func newSimonvetterDriver(config *Config) (*simonvetterDriver, error) {
 }
 
 func (d *simonvetterDriver) Execute(ctx context.Context, slaveID uint8, allowRetry bool, operation func() (*mcp.CallToolResult, error)) (*mcp.CallToolResult, error) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
+	d.connMu.Lock()
+	defer d.connMu.Unlock()
 
 	now := time.Now()
-	if !d.stats.CircuitOpenUntil.IsZero() && now.Before(d.stats.CircuitOpenUntil) {
-		return nil, fmt.Errorf("modbus circuit open until %s after repeated failures", d.stats.CircuitOpenUntil.Format(time.RFC3339))
+	if openUntil, ok := d.circuitOpenUntil(now); ok {
+		return nil, fmt.Errorf("modbus circuit open until %s after repeated failures", openUntil.Format(time.RFC3339))
 	}
 
 	attempts := 1
@@ -132,20 +133,20 @@ func (d *simonvetterDriver) Execute(ctx context.Context, slaveID uint8, allowRet
 			d.client = nil
 		}
 
-		d.stats.TotalRetries++
+		d.incrementRetries()
 		backoff := d.backoffForAttempt(attempt)
 		log.Printf("modbus/simonvetter: transient error (attempt %d/%d), retrying in %s: %v", attempt, attempts, backoff, lastErr)
 
-		d.mu.Unlock()
+		d.connMu.Unlock()
 		timer := time.NewTimer(backoff)
 		select {
 		case <-ctx.Done():
 			timer.Stop()
-			d.mu.Lock()
+			d.connMu.Lock()
 			return nil, fmt.Errorf("operation canceled during retry backoff: %w", ctx.Err())
 		case <-timer.C:
 		}
-		d.mu.Lock()
+		d.connMu.Lock()
 	}
 
 	d.recordFailure(lastErr)
@@ -185,8 +186,8 @@ func (d *simonvetterDriver) createClient() (*svmodbus.ModbusClient, error) {
 }
 
 func (d *simonvetterDriver) Close() error {
-	d.mu.Lock()
-	defer d.mu.Unlock()
+	d.connMu.Lock()
+	defer d.connMu.Unlock()
 	if d.client != nil {
 		err := d.client.Close()
 		d.client = nil
@@ -196,8 +197,8 @@ func (d *simonvetterDriver) Close() error {
 }
 
 func (d *simonvetterDriver) Status() ClientStatus {
-	d.mu.Lock()
-	defer d.mu.Unlock()
+	d.statsMu.Lock()
+	defer d.statsMu.Unlock()
 
 	status := ClientStatus{
 		Driver:              d.DriverName(),
@@ -313,12 +314,16 @@ func (d *simonvetterDriver) backoffForAttempt(attempt int) time.Duration {
 }
 
 func (d *simonvetterDriver) recordSuccess() {
+	d.statsMu.Lock()
+	defer d.statsMu.Unlock()
 	d.stats.TotalOperations++
 	d.stats.ConsecutiveFailures = 0
 	d.stats.CircuitOpenUntil = time.Time{}
 }
 
 func (d *simonvetterDriver) recordFailure(err error) {
+	d.statsMu.Lock()
+	defer d.statsMu.Unlock()
 	d.stats.TotalOperations++
 	d.stats.TotalFailures++
 	d.stats.ConsecutiveFailures++
@@ -330,6 +335,21 @@ func (d *simonvetterDriver) recordFailure(err error) {
 	if int(d.stats.ConsecutiveFailures) >= d.config.CircuitTripAfter {
 		d.stats.CircuitOpenUntil = time.Now().Add(d.config.CircuitOpenFor)
 	}
+}
+
+func (d *simonvetterDriver) incrementRetries() {
+	d.statsMu.Lock()
+	defer d.statsMu.Unlock()
+	d.stats.TotalRetries++
+}
+
+func (d *simonvetterDriver) circuitOpenUntil(now time.Time) (time.Time, bool) {
+	d.statsMu.Lock()
+	defer d.statsMu.Unlock()
+	if d.stats.CircuitOpenUntil.IsZero() || !now.Before(d.stats.CircuitOpenUntil) {
+		return time.Time{}, false
+	}
+	return d.stats.CircuitOpenUntil, true
 }
 
 func normalizeDriverError(err error) error {
