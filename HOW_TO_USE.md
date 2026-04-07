@@ -11,7 +11,7 @@ This document shows how to run the Modbus MCP server and validate it end-to-end 
 Build locally:
 
 ```bash
-go build -o modbus-server main.go
+go build -o modbus-server .
 ```
 
 Run server:

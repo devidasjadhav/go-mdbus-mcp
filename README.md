@@ -33,7 +33,7 @@ The server exposes the following MCP Tools to your LLM:
 Ensure you have Go 1.25+ installed.
 
 ```bash
-go build -o modbus-server main.go
+go build -o modbus-server .
 
 # Connect to a default simulator (192.168.1.22:5002) using Streamable HTTP on port 8080
 ./modbus-server
@@ -151,6 +151,12 @@ Detailed usage and OpenCode validation steps are documented in `HOW_TO_USE.md`.
 Validated test runs and outcomes are documented in `TEST_DOCUMENT.md`.
 
 Security deployment guidance is documented in `SECURITY.md`.
+
+Configuration and precedence reference is documented in `CONFIG_REFERENCE.md`.
+
+Tag CSV schema and typing reference is documented in `TAG_CSV_REFERENCE.md`.
+
+Architecture overview is documented in `ARCHITECTURE.md`.
 
 Standard Go toolchains are used. The heavy lifting is done via the `modbus` folder.
 
