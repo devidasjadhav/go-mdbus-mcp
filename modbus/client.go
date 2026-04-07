@@ -138,6 +138,34 @@ func (mc *ModbusClient) Client() modbus.Client {
 	return mc.client
 }
 
+func (mc *ModbusClient) ReadHoldingRegisters(address, quantity uint16) ([]byte, error) {
+	return mc.client.ReadHoldingRegisters(address, quantity)
+}
+
+func (mc *ModbusClient) ReadInputRegisters(address, quantity uint16) ([]byte, error) {
+	return mc.client.ReadInputRegisters(address, quantity)
+}
+
+func (mc *ModbusClient) ReadCoils(address, quantity uint16) ([]byte, error) {
+	return mc.client.ReadCoils(address, quantity)
+}
+
+func (mc *ModbusClient) ReadDiscreteInputs(address, quantity uint16) ([]byte, error) {
+	return mc.client.ReadDiscreteInputs(address, quantity)
+}
+
+func (mc *ModbusClient) WriteSingleRegister(address, value uint16) ([]byte, error) {
+	return mc.client.WriteSingleRegister(address, value)
+}
+
+func (mc *ModbusClient) WriteMultipleRegisters(address, quantity uint16, value []byte) ([]byte, error) {
+	return mc.client.WriteMultipleRegisters(address, quantity, value)
+}
+
+func (mc *ModbusClient) WriteMultipleCoils(address, quantity uint16, value []byte) ([]byte, error) {
+	return mc.client.WriteMultipleCoils(address, quantity, value)
+}
+
 // Execute performs a thread-safe Modbus operation and refreshes the TCP connection.
 //
 // Some Modbus servers close idle TCP sessions after a short timeout. Reusing the same

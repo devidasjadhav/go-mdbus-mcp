@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/devidasjadhav/go-mdbus-mcp/internal/logx"
 	"github.com/devidasjadhav/go-mdbus-mcp/modbus"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -23,7 +24,7 @@ var version = "dev"
 
 func main() {
 	// Standard logging writes to stderr so it doesn't corrupt stdout for stdio transport
-	log.SetOutput(os.Stderr)
+	logx.ConfigureStderr()
 
 	configPath := flag.String("config", "", "Path to YAML/JSON config file")
 	tagMapCSV := flag.String("tag-map-csv", "", "Path to CSV tag mapping file")

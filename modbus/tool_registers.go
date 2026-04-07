@@ -9,17 +9,17 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-func registerDataTools(s *mcp.Server, mc *ModbusClient, writePolicy *WritePolicy) {
+func registerDataTools(s *mcp.Server, driver Driver, writePolicy *WritePolicy) {
 	mcp.AddTool(s,
 		&mcp.Tool{Name: "read-holding-registers", Description: "Read Modbus holding registers"},
 		func(ctx context.Context, req *mcp.CallToolRequest, args ReadArgs) (*mcp.CallToolResult, any, error) {
-			return executeTool(ctx, mc, args.SlaveID, true, func() (*mcp.CallToolResult, error) {
+			return executeTool(ctx, driver, args.SlaveID, true, func() (*mcp.CallToolResult, error) {
 				if args.Quantity == 0 {
 					return nil, fmt.Errorf("quantity must be greater than 0")
 				}
 
 				log.Printf("Reading holding registers: address=%d, quantity=%d", args.Address, args.Quantity)
-				results, err := mc.Client().ReadHoldingRegisters(args.Address, args.Quantity)
+				results, err := driver.ReadHoldingRegisters(args.Address, args.Quantity)
 				if err != nil {
 					return nil, fmt.Errorf("error reading holding registers: %w", err)
 				}
@@ -37,13 +37,13 @@ func registerDataTools(s *mcp.Server, mc *ModbusClient, writePolicy *WritePolicy
 	mcp.AddTool(s,
 		&mcp.Tool{Name: "read-coils", Description: "Read Modbus coils (digital inputs/outputs)"},
 		func(ctx context.Context, req *mcp.CallToolRequest, args ReadArgs) (*mcp.CallToolResult, any, error) {
-			return executeTool(ctx, mc, args.SlaveID, true, func() (*mcp.CallToolResult, error) {
+			return executeTool(ctx, driver, args.SlaveID, true, func() (*mcp.CallToolResult, error) {
 				if args.Quantity == 0 {
 					return nil, fmt.Errorf("quantity must be greater than 0")
 				}
 
 				log.Printf("Reading coils: address=%d, quantity=%d", args.Address, args.Quantity)
-				results, err := mc.Client().ReadCoils(args.Address, args.Quantity)
+				results, err := driver.ReadCoils(args.Address, args.Quantity)
 				if err != nil {
 					return nil, fmt.Errorf("error reading coils: %w", err)
 				}
@@ -65,13 +65,13 @@ func registerDataTools(s *mcp.Server, mc *ModbusClient, writePolicy *WritePolicy
 	mcp.AddTool(s,
 		&mcp.Tool{Name: "read-input-registers", Description: "Read Modbus input registers"},
 		func(ctx context.Context, req *mcp.CallToolRequest, args ReadArgs) (*mcp.CallToolResult, any, error) {
-			return executeTool(ctx, mc, args.SlaveID, true, func() (*mcp.CallToolResult, error) {
+			return executeTool(ctx, driver, args.SlaveID, true, func() (*mcp.CallToolResult, error) {
 				if args.Quantity == 0 {
 					return nil, fmt.Errorf("quantity must be greater than 0")
 				}
 
 				log.Printf("Reading input registers: address=%d, quantity=%d", args.Address, args.Quantity)
-				results, err := mc.Client().ReadInputRegisters(args.Address, args.Quantity)
+				results, err := driver.ReadInputRegisters(args.Address, args.Quantity)
 				if err != nil {
 					return nil, fmt.Errorf("error reading input registers: %w", err)
 				}
@@ -85,13 +85,13 @@ func registerDataTools(s *mcp.Server, mc *ModbusClient, writePolicy *WritePolicy
 	mcp.AddTool(s,
 		&mcp.Tool{Name: "read-discrete-inputs", Description: "Read Modbus discrete inputs"},
 		func(ctx context.Context, req *mcp.CallToolRequest, args ReadArgs) (*mcp.CallToolResult, any, error) {
-			return executeTool(ctx, mc, args.SlaveID, true, func() (*mcp.CallToolResult, error) {
+			return executeTool(ctx, driver, args.SlaveID, true, func() (*mcp.CallToolResult, error) {
 				if args.Quantity == 0 {
 					return nil, fmt.Errorf("quantity must be greater than 0")
 				}
 
 				log.Printf("Reading discrete inputs: address=%d, quantity=%d", args.Address, args.Quantity)
-				results, err := mc.Client().ReadDiscreteInputs(args.Address, args.Quantity)
+				results, err := driver.ReadDiscreteInputs(args.Address, args.Quantity)
 				if err != nil {
 					return nil, fmt.Errorf("error reading discrete inputs: %w", err)
 				}
@@ -105,7 +105,7 @@ func registerDataTools(s *mcp.Server, mc *ModbusClient, writePolicy *WritePolicy
 	mcp.AddTool(s,
 		&mcp.Tool{Name: "read-holding-registers-typed", Description: "Read holding registers and decode typed value"},
 		func(ctx context.Context, req *mcp.CallToolRequest, args ReadHoldingTypedArgs) (*mcp.CallToolResult, any, error) {
-			return executeTool(ctx, mc, args.SlaveID, true, func() (*mcp.CallToolResult, error) {
+			return executeTool(ctx, driver, args.SlaveID, true, func() (*mcp.CallToolResult, error) {
 				typeName := normalizeDataType(args.DataType)
 				if typeName == "" {
 					return nil, fmt.Errorf("data_type is required")
@@ -147,7 +147,7 @@ func registerDataTools(s *mcp.Server, mc *ModbusClient, writePolicy *WritePolicy
 				}
 
 				log.Printf("Reading typed holding registers: address=%d, quantity=%d, data_type=%s", args.Address, qty, typeName)
-				results, err := mc.Client().ReadHoldingRegisters(args.Address, qty)
+				results, err := driver.ReadHoldingRegisters(args.Address, qty)
 				if err != nil {
 					return nil, fmt.Errorf("error reading holding registers: %w", err)
 				}
@@ -170,14 +170,14 @@ func registerDataTools(s *mcp.Server, mc *ModbusClient, writePolicy *WritePolicy
 				return errorResult(err.Error()), nil, nil
 			}
 
-			return executeTool(ctx, mc, args.SlaveID, false, func() (*mcp.CallToolResult, error) {
+			return executeTool(ctx, driver, args.SlaveID, false, func() (*mcp.CallToolResult, error) {
 				if len(args.Values) == 0 {
 					return nil, fmt.Errorf("values must contain at least one register value")
 				}
 
 				log.Printf("Writing holding registers: address=%d, values=%v", args.Address, args.Values)
 				if len(args.Values) == 1 {
-					_, err := mc.Client().WriteSingleRegister(args.Address, args.Values[0])
+					_, err := driver.WriteSingleRegister(args.Address, args.Values[0])
 					if err != nil {
 						return nil, fmt.Errorf("error writing holding register: %w", err)
 					}
@@ -191,7 +191,7 @@ func registerDataTools(s *mcp.Server, mc *ModbusClient, writePolicy *WritePolicy
 					data[i*2+1] = byte(val & 0xFF)
 				}
 
-				_, err := mc.Client().WriteMultipleRegisters(args.Address, uint16(len(args.Values)), data)
+				_, err := driver.WriteMultipleRegisters(args.Address, uint16(len(args.Values)), data)
 				if err != nil {
 					return nil, fmt.Errorf("error writing holding registers: %w", err)
 				}
@@ -208,7 +208,7 @@ func registerDataTools(s *mcp.Server, mc *ModbusClient, writePolicy *WritePolicy
 				return errorResult(err.Error()), nil, nil
 			}
 
-			return executeTool(ctx, mc, args.SlaveID, false, func() (*mcp.CallToolResult, error) {
+			return executeTool(ctx, driver, args.SlaveID, false, func() (*mcp.CallToolResult, error) {
 				if len(args.Values) == 0 {
 					return nil, fmt.Errorf("values must contain at least one coil value")
 				}
@@ -222,7 +222,7 @@ func registerDataTools(s *mcp.Server, mc *ModbusClient, writePolicy *WritePolicy
 					}
 				}
 
-				_, err := mc.Client().WriteMultipleCoils(args.Address, uint16(len(args.Values)), coilBytes)
+				_, err := driver.WriteMultipleCoils(args.Address, uint16(len(args.Values)), coilBytes)
 				if err != nil {
 					return nil, fmt.Errorf("error writing coils: %w", err)
 				}

@@ -8,13 +8,13 @@ import (
 
 // executeTool is a helper to run thread-safe operations on the Modbus client
 // and handle any protocol errors.
-func executeTool(ctx context.Context, mc *ModbusClient, slaveID *uint8, allowRetry bool, operation func() (*mcp.CallToolResult, error)) (*mcp.CallToolResult, any, error) {
+func executeTool(ctx context.Context, driver Driver, slaveID *uint8, allowRetry bool, operation func() (*mcp.CallToolResult, error)) (*mcp.CallToolResult, any, error) {
 	targetSlaveID := uint8(1)
 	if slaveID != nil {
 		targetSlaveID = *slaveID
 	}
 
-	res, err := mc.Execute(ctx, targetSlaveID, allowRetry, operation)
+	res, err := driver.Execute(ctx, targetSlaveID, allowRetry, operation)
 	if err != nil {
 		// As per the official SDK docs, we return formatting errors directly inside CallToolResult
 		// rather than returning a protocol error to avoid hanging the MCP stream.

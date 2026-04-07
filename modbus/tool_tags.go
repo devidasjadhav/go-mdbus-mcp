@@ -8,7 +8,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-func registerTagTools(s *mcp.Server, mc *ModbusClient, writePolicy *WritePolicy, tagMap *TagMap) {
+func registerTagTools(s *mcp.Server, driver Driver, writePolicy *WritePolicy, tagMap *TagMap) {
 	mcp.AddTool(s,
 		&mcp.Tool{Name: "list-tags", Description: "List configured semantic Modbus tags"},
 		func(ctx context.Context, req *mcp.CallToolRequest, args struct{}) (*mcp.CallToolResult, any, error) {
@@ -36,10 +36,10 @@ func registerTagTools(s *mcp.Server, mc *ModbusClient, writePolicy *WritePolicy,
 			}
 
 			targetSlave := resolveSlaveID(args.SlaveID, tag.SlaveID)
-			return executeTool(ctx, mc, targetSlave, true, func() (*mcp.CallToolResult, error) {
+			return executeTool(ctx, driver, targetSlave, true, func() (*mcp.CallToolResult, error) {
 				switch tag.Kind {
 				case TagKindHolding:
-					results, err := mc.Client().ReadHoldingRegisters(tag.Address, tag.Quantity)
+					results, err := driver.ReadHoldingRegisters(tag.Address, tag.Quantity)
 					if err != nil {
 						return nil, fmt.Errorf("error reading tag %q: %w", tag.Name, err)
 					}
@@ -69,7 +69,7 @@ func registerTagTools(s *mcp.Server, mc *ModbusClient, writePolicy *WritePolicy,
 					return successResult(string(raw)), nil
 
 				case TagKindCoil:
-					results, err := mc.Client().ReadCoils(tag.Address, tag.Quantity)
+					results, err := driver.ReadCoils(tag.Address, tag.Quantity)
 					if err != nil {
 						return nil, fmt.Errorf("error reading tag %q: %w", tag.Name, err)
 					}
@@ -154,9 +154,9 @@ func registerTagTools(s *mcp.Server, mc *ModbusClient, writePolicy *WritePolicy,
 					return errorResult(err.Error()), nil, nil
 				}
 
-				return executeTool(ctx, mc, targetSlave, false, func() (*mcp.CallToolResult, error) {
+				return executeTool(ctx, driver, targetSlave, false, func() (*mcp.CallToolResult, error) {
 					if len(holdingValues) == 1 {
-						_, err := mc.Client().WriteSingleRegister(tag.Address, holdingValues[0])
+						_, err := driver.WriteSingleRegister(tag.Address, holdingValues[0])
 						if err != nil {
 							return nil, fmt.Errorf("error writing tag %q: %w", tag.Name, err)
 						}
@@ -168,7 +168,7 @@ func registerTagTools(s *mcp.Server, mc *ModbusClient, writePolicy *WritePolicy,
 						data[i*2] = byte(val >> 8)
 						data[i*2+1] = byte(val & 0xFF)
 					}
-					_, err := mc.Client().WriteMultipleRegisters(tag.Address, uint16(len(holdingValues)), data)
+					_, err := driver.WriteMultipleRegisters(tag.Address, uint16(len(holdingValues)), data)
 					if err != nil {
 						return nil, fmt.Errorf("error writing tag %q: %w", tag.Name, err)
 					}
@@ -205,7 +205,7 @@ func registerTagTools(s *mcp.Server, mc *ModbusClient, writePolicy *WritePolicy,
 					return errorResult(err.Error()), nil, nil
 				}
 
-				return executeTool(ctx, mc, targetSlave, false, func() (*mcp.CallToolResult, error) {
+				return executeTool(ctx, driver, targetSlave, false, func() (*mcp.CallToolResult, error) {
 					byteCount := (len(coilValues) + 7) / 8
 					coilBytes := make([]byte, byteCount)
 					for i, val := range coilValues {
@@ -213,7 +213,7 @@ func registerTagTools(s *mcp.Server, mc *ModbusClient, writePolicy *WritePolicy,
 							coilBytes[i/8] |= (1 << uint(i%8))
 						}
 					}
-					_, err := mc.Client().WriteMultipleCoils(tag.Address, uint16(len(coilValues)), coilBytes)
+					_, err := driver.WriteMultipleCoils(tag.Address, uint16(len(coilValues)), coilBytes)
 					if err != nil {
 						return nil, fmt.Errorf("error writing tag %q: %w", tag.Name, err)
 					}

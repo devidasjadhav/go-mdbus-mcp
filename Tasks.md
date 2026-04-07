@@ -7,11 +7,11 @@ Each phase should end with a dedicated commit.
 
 Goal: introduce seams/interfaces while preserving current behavior.
 
-- [ ] Create internal `modbus` driver interface (read/write/status/close contract).
-- [ ] Wrap existing Goburrow implementation behind adapter (`goburrow` adapter).
-- [ ] Update tool handlers to depend on the driver interface instead of concrete client type.
-- [ ] Introduce `internal/logx` logger setup helper and route startup logger initialization through it.
-- [ ] Keep runtime behavior unchanged and verify with `go test ./...`.
+- [x] Create internal `modbus` driver interface (read/write/status/close contract).
+- [x] Wrap existing Goburrow implementation behind adapter (`goburrow` adapter).
+- [x] Update tool handlers to depend on the driver interface instead of concrete client type.
+- [x] Introduce `internal/logx` logger setup helper and route startup logger initialization through it.
+- [x] Keep runtime behavior unchanged and verify with `go test ./...`.
 
 Commit target:
 
