@@ -2,6 +2,8 @@ package modbus
 
 import (
 	"context"
+	"log"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -14,7 +16,14 @@ func executeTool(ctx context.Context, driver Driver, slaveID *uint8, allowRetry 
 		targetSlaveID = *slaveID
 	}
 
+	start := time.Now()
 	res, err := driver.Execute(ctx, targetSlaveID, allowRetry, operation)
+	elapsed := time.Since(start)
+	if err != nil {
+		log.Printf("modbus op failed driver=%s mode=%s slave_id=%d allow_retry=%t duration=%s err=%v", driver.DriverName(), driver.TransportMode(), targetSlaveID, allowRetry, elapsed, err)
+	} else {
+		log.Printf("modbus op success driver=%s mode=%s slave_id=%d allow_retry=%t duration=%s", driver.DriverName(), driver.TransportMode(), targetSlaveID, allowRetry, elapsed)
+	}
 	if err != nil {
 		// As per the official SDK docs, we return formatting errors directly inside CallToolResult
 		// rather than returning a protocol error to avoid hanging the MCP stream.

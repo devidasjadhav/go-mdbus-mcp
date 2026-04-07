@@ -6,6 +6,8 @@ A lightweight, high-performance [Model Context Protocol (MCP)](https://modelcont
 
 - **Official SDK**: Built securely on top of the official `github.com/modelcontextprotocol/go-sdk`.
 - **Multiple Transports**: Fully supports `stdio`, Server-Sent Events (`sse`), and the new Streamable HTTP (`streamable`) MCP protocols.
+- **Pluggable Drivers**: Supports `goburrow` and `simonvetter` drivers via `--modbus-driver`.
+- **RTU + TCP Modes**: Supports both `tcp` and `rtu` bus modes via `--modbus-mode`.
 - **Session-Safe Streamable HTTP**: Streamable transport runs in stateless JSON mode to avoid stale session issues (`session not found`) across reconnects.
 - **Resilient Connections**: Thread-safe Modbus dialer reconnects safely for each operation and recovers cleanly from idle timeout disconnects.
 - **Write Safety Guard**: Write tools are disabled by default and require explicit enablement via environment policy.
@@ -53,6 +55,12 @@ go build -o modbus-server .
 # Connect to a specific PLC IP and Port using STDIO (Best for Claude Desktop / Cursor)
 ./modbus-server --modbus-ip 10.0.0.50 --modbus-port 502 --transport stdio
 
+# Use simonvetter driver over TCP
+./modbus-server --modbus-driver simonvetter --modbus-mode tcp --modbus-ip 10.0.0.50 --modbus-port 502
+
+# Use simonvetter driver over RTU serial
+./modbus-server --modbus-driver simonvetter --modbus-mode rtu --serial-port /dev/ttyUSB0 --baud-rate 9600 --data-bits 8 --parity N --stop-bits 1
+
 # Run using standard Server-Sent Events (SSE)
 ./modbus-server --transport sse
 
@@ -79,6 +87,13 @@ Example `server-config.yaml`:
 ```yaml
 modbus_ip: 192.168.1.22
 modbus_port: 5002
+modbus_driver: goburrow
+modbus_mode: tcp
+serial_port: /dev/ttyUSB0
+baud_rate: 9600
+data_bits: 8
+parity: N
+stop_bits: 1
 transport: streamable
 tag_map_csv: ./tag-map.csv
 modbus_timeout: 10s

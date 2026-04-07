@@ -20,6 +20,18 @@ type simonvetterDriver struct {
 	stats  clientStats
 }
 
+func (d *simonvetterDriver) DriverName() string {
+	return "simonvetter"
+}
+
+func (d *simonvetterDriver) TransportMode() string {
+	mode := strings.ToLower(strings.TrimSpace(d.config.Mode))
+	if mode == "" {
+		return "tcp"
+	}
+	return mode
+}
+
 func newSimonvetterDriver(config *Config) (*simonvetterDriver, error) {
 	applyCommonDefaults(config)
 	if config.BaudRate <= 0 {
@@ -182,11 +194,14 @@ func (d *simonvetterDriver) Status() ClientStatus {
 	defer d.mu.Unlock()
 
 	status := ClientStatus{
+		Driver:              d.DriverName(),
+		Mode:                d.TransportMode(),
 		TotalOperations:     d.stats.TotalOperations,
 		TotalFailures:       d.stats.TotalFailures,
 		TotalRetries:        d.stats.TotalRetries,
 		ConsecutiveFailures: d.stats.ConsecutiveFailures,
 		LastError:           d.stats.LastError,
+		LastErrorCategory:   d.stats.LastErrorCategory,
 		CircuitOpen:         !d.stats.CircuitOpenUntil.IsZero() && time.Now().Before(d.stats.CircuitOpenUntil),
 	}
 
@@ -298,6 +313,7 @@ func (d *simonvetterDriver) recordFailure(err error) {
 	d.stats.ConsecutiveFailures++
 	if err != nil {
 		d.stats.LastError = err.Error()
+		d.stats.LastErrorCategory = errorCategory(err)
 	}
 	d.stats.LastErrorAt = time.Now()
 	if int(d.stats.ConsecutiveFailures) >= d.config.CircuitTripAfter {
@@ -309,16 +325,7 @@ func normalizeDriverError(err error) error {
 	if err == nil {
 		return nil
 	}
-	msg := strings.ToLower(err.Error())
-	category := "other"
-	switch {
-	case containsAny(msg, "timeout", "i/o timeout", "deadline exceeded"):
-		category = "timeout"
-	case containsAny(msg, "connection refused", "connection reset", "broken pipe", "no such file", "network"):
-		category = "connection"
-	case containsAny(msg, "modbus", "exception", "crc", "framing"):
-		category = "protocol"
-	}
+	category := errorCategory(err)
 	return fmt.Errorf("%s: %w", category, err)
 }
 

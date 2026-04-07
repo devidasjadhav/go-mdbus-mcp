@@ -29,17 +29,21 @@ type clientStats struct {
 	TotalRetries        uint64
 	ConsecutiveFailures uint64
 	LastError           string
+	LastErrorCategory   string
 	LastErrorAt         time.Time
 	CircuitOpenUntil    time.Time
 }
 
 // ClientStatus exposes connection lifecycle stats for diagnostics.
 type ClientStatus struct {
+	Driver              string     `json:"driver"`
+	Mode                string     `json:"mode"`
 	TotalOperations     uint64     `json:"total_operations"`
 	TotalFailures       uint64     `json:"total_failures"`
 	TotalRetries        uint64     `json:"total_retries"`
 	ConsecutiveFailures uint64     `json:"consecutive_failures"`
 	LastError           string     `json:"last_error,omitempty"`
+	LastErrorCategory   string     `json:"last_error_category,omitempty"`
 	LastErrorAt         *time.Time `json:"last_error_at,omitempty"`
 	CircuitOpenUntil    *time.Time `json:"circuit_open_until,omitempty"`
 	CircuitOpen         bool       `json:"circuit_open"`
@@ -151,6 +155,18 @@ func (mc *ModbusClient) Client() modbus.Client {
 
 func (mc *ModbusClient) ReadHoldingRegisters(address, quantity uint16) ([]byte, error) {
 	return mc.client.ReadHoldingRegisters(address, quantity)
+}
+
+func (mc *ModbusClient) DriverName() string {
+	return "goburrow"
+}
+
+func (mc *ModbusClient) TransportMode() string {
+	mode := strings.ToLower(strings.TrimSpace(mc.config.Mode))
+	if mode == "" {
+		return "tcp"
+	}
+	return mode
 }
 
 func (mc *ModbusClient) ReadInputRegisters(address, quantity uint16) ([]byte, error) {
@@ -272,11 +288,14 @@ func (mc *ModbusClient) Status() ClientStatus {
 	defer mc.mu.Unlock()
 
 	status := ClientStatus{
+		Driver:              mc.DriverName(),
+		Mode:                mc.TransportMode(),
 		TotalOperations:     mc.stats.TotalOperations,
 		TotalFailures:       mc.stats.TotalFailures,
 		TotalRetries:        mc.stats.TotalRetries,
 		ConsecutiveFailures: mc.stats.ConsecutiveFailures,
 		LastError:           mc.stats.LastError,
+		LastErrorCategory:   mc.stats.LastErrorCategory,
 		CircuitOpen:         !mc.stats.CircuitOpenUntil.IsZero() && time.Now().Before(mc.stats.CircuitOpenUntil),
 	}
 
@@ -314,6 +333,7 @@ func (mc *ModbusClient) recordFailure(err error) {
 	mc.stats.TotalFailures++
 	mc.stats.ConsecutiveFailures++
 	mc.stats.LastError = err.Error()
+	mc.stats.LastErrorCategory = errorCategory(err)
 	mc.stats.LastErrorAt = time.Now()
 	if int(mc.stats.ConsecutiveFailures) >= mc.config.CircuitTripAfter {
 		mc.stats.CircuitOpenUntil = time.Now().Add(mc.config.CircuitOpenFor)

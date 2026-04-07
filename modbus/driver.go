@@ -9,6 +9,8 @@ import (
 // Driver defines the operations needed by MCP tools, independent of
 // the underlying Modbus library implementation.
 type Driver interface {
+	DriverName() string
+	TransportMode() string
 	Execute(ctx context.Context, slaveID uint8, allowRetry bool, operation func() (*mcp.CallToolResult, error)) (*mcp.CallToolResult, error)
 	ReadHoldingRegisters(address, quantity uint16) ([]byte, error)
 	ReadInputRegisters(address, quantity uint16) ([]byte, error)

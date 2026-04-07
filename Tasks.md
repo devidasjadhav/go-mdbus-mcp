@@ -63,10 +63,10 @@ Commit target:
 
 Goal: improve operability and maintainability before default switch.
 
-- [ ] Add structured operation logs (driver, mode, slave_id, function, latency, retries).
-- [ ] Add expanded status reporting for active driver/mode and recent error class.
-- [ ] Add soak-style reliability test harness for repeated operations.
-- [ ] Update docs (`README.md`) with driver selection and RTU usage examples.
+- [x] Add structured operation logs (driver, mode, slave_id, function, latency, retries).
+- [x] Add expanded status reporting for active driver/mode and recent error class.
+- [x] Add soak-style reliability test harness for repeated operations.
+- [x] Update docs (`README.md`) with driver selection and RTU usage examples.
 
 Commit target:
 
