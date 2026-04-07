@@ -19,12 +19,15 @@ The server exposes the following MCP Tools to your LLM:
 
 1. `read-holding-registers`: Read an array of `uint16` values from a specified address.
 2. `read-coils`: Read an array of `boolean` flags from a specified digital input/output address.
-3. `write-holding-registers`: Write an array of `uint16` values sequentially starting at a specified address.
-4. `write-coils`: Write an array of `boolean` flags sequentially starting at a specified address.
-5. `get-modbus-client-status`: Inspect retry counters, failures, and circuit state.
-6. `list-tags`: List configured semantic tag definitions.
-7. `read-tag`: Read by semantic tag name.
-8. `write-tag`: Write by semantic tag name (subject to write policy), with raw arrays or typed values (`numeric_value`, `string_value`, `bool_value`).
+3. `read-input-registers`: Read Modbus input registers.
+4. `read-discrete-inputs`: Read Modbus discrete inputs.
+5. `read-holding-registers-typed`: Read and decode typed holding-register values (`uint16`, `int16`, `uint32`, `int32`, `float32`, `string`) with optional byte/word order and scale/offset.
+6. `write-holding-registers`: Write an array of `uint16` values sequentially starting at a specified address.
+7. `write-coils`: Write an array of `boolean` flags sequentially starting at a specified address.
+8. `get-modbus-client-status`: Inspect retry counters, failures, and circuit state.
+9. `list-tags`: List configured semantic tag definitions.
+10. `read-tag`: Read by semantic tag name.
+11. `write-tag`: Write by semantic tag name (subject to write policy), with raw arrays or typed values (`numeric_value`, `string_value`, `bool_value`).
 
 ## Quick Start
 

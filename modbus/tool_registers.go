@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -57,6 +58,107 @@ func registerDataTools(s *mcp.Server, mc *ModbusClient, writePolicy *WritePolicy
 				}
 
 				return successResult(fmt.Sprintf("Coils at address %d: %v", args.Address, coilStates)), nil
+			})
+		},
+	)
+
+	mcp.AddTool(s,
+		&mcp.Tool{Name: "read-input-registers", Description: "Read Modbus input registers"},
+		func(ctx context.Context, req *mcp.CallToolRequest, args ReadArgs) (*mcp.CallToolResult, any, error) {
+			return executeTool(ctx, mc, args.SlaveID, true, func() (*mcp.CallToolResult, error) {
+				if args.Quantity == 0 {
+					return nil, fmt.Errorf("quantity must be greater than 0")
+				}
+
+				log.Printf("Reading input registers: address=%d, quantity=%d", args.Address, args.Quantity)
+				results, err := mc.Client().ReadInputRegisters(args.Address, args.Quantity)
+				if err != nil {
+					return nil, fmt.Errorf("error reading input registers: %w", err)
+				}
+
+				values := wordsFromBytes(results)
+				return successResult(fmt.Sprintf("Input registers at address %d: %v", args.Address, values)), nil
+			})
+		},
+	)
+
+	mcp.AddTool(s,
+		&mcp.Tool{Name: "read-discrete-inputs", Description: "Read Modbus discrete inputs"},
+		func(ctx context.Context, req *mcp.CallToolRequest, args ReadArgs) (*mcp.CallToolResult, any, error) {
+			return executeTool(ctx, mc, args.SlaveID, true, func() (*mcp.CallToolResult, error) {
+				if args.Quantity == 0 {
+					return nil, fmt.Errorf("quantity must be greater than 0")
+				}
+
+				log.Printf("Reading discrete inputs: address=%d, quantity=%d", args.Address, args.Quantity)
+				results, err := mc.Client().ReadDiscreteInputs(args.Address, args.Quantity)
+				if err != nil {
+					return nil, fmt.Errorf("error reading discrete inputs: %w", err)
+				}
+
+				states := coilStatesFromBytes(results, args.Quantity)
+				return successResult(fmt.Sprintf("Discrete inputs at address %d: %v", args.Address, states)), nil
+			})
+		},
+	)
+
+	mcp.AddTool(s,
+		&mcp.Tool{Name: "read-holding-registers-typed", Description: "Read holding registers and decode typed value"},
+		func(ctx context.Context, req *mcp.CallToolRequest, args ReadHoldingTypedArgs) (*mcp.CallToolResult, any, error) {
+			return executeTool(ctx, mc, args.SlaveID, true, func() (*mcp.CallToolResult, error) {
+				typeName := normalizeDataType(args.DataType)
+				if typeName == "" {
+					return nil, fmt.Errorf("data_type is required")
+				}
+
+				qty := expectedQuantity(TagKindHolding, typeName)
+				if args.Quantity != nil {
+					qty = *args.Quantity
+				}
+				if qty == 0 {
+					return nil, fmt.Errorf("quantity must be provided for data_type %q", typeName)
+				}
+
+				tag := TagDef{
+					Name:      "typed_read",
+					Kind:      TagKindHolding,
+					Address:   args.Address,
+					Quantity:  qty,
+					DataType:  typeName,
+					ByteOrder: "big",
+					WordOrder: "msw",
+					Scale:     1,
+					ScaleSet:  true,
+				}
+				if args.ByteOrder != nil {
+					tag.ByteOrder = normalizeByteOrder(*args.ByteOrder)
+				}
+				if args.WordOrder != nil {
+					tag.WordOrder = normalizeWordOrder(*args.WordOrder)
+				}
+				if args.Scale != nil {
+					tag.Scale = *args.Scale
+				}
+				if args.Offset != nil {
+					tag.Offset = *args.Offset
+				}
+				if err := validateDataType(tag); err != nil {
+					return nil, err
+				}
+
+				log.Printf("Reading typed holding registers: address=%d, quantity=%d, data_type=%s", args.Address, qty, typeName)
+				results, err := mc.Client().ReadHoldingRegisters(args.Address, qty)
+				if err != nil {
+					return nil, fmt.Errorf("error reading holding registers: %w", err)
+				}
+
+				words := wordsFromBytes(results)
+				decoded, err := decodeHoldingTagValue(tag, words)
+				if err != nil {
+					return nil, fmt.Errorf("error decoding holding registers: %w", err)
+				}
+
+				return successResult(fmt.Sprintf("Typed holding registers at address %d (%s): decoded=%v raw=%v", args.Address, strings.ToLower(typeName), decoded, words)), nil
 			})
 		},
 	)
@@ -129,4 +231,24 @@ func registerDataTools(s *mcp.Server, mc *ModbusClient, writePolicy *WritePolicy
 			})
 		},
 	)
+}
+
+func wordsFromBytes(results []byte) []uint16 {
+	values := make([]uint16, len(results)/2)
+	for i := 0; i+1 < len(results); i += 2 {
+		values[i/2] = uint16(results[i])<<8 | uint16(results[i+1])
+	}
+	return values
+}
+
+func coilStatesFromBytes(results []byte, quantity uint16) []bool {
+	states := make([]bool, quantity)
+	for i := uint16(0); i < quantity; i++ {
+		byteIndex := i / 8
+		bitIndex := i % 8
+		if byteIndex < uint16(len(results)) {
+			states[i] = (results[byteIndex] & (1 << bitIndex)) != 0
+		}
+	}
+	return states
 }

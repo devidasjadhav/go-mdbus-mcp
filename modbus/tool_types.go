@@ -21,6 +21,17 @@ type WriteCoilsArgs struct {
 	SlaveID *uint8 `json:"slave_id,omitempty" jsonschema:"Optional Modbus Slave ID (defaults to 1)"`
 }
 
+type ReadHoldingTypedArgs struct {
+	Address   uint16   `json:"address" jsonschema:"Starting address to read from"`
+	Quantity  *uint16  `json:"quantity,omitempty" jsonschema:"Optional register count (derived from data_type when omitted)"`
+	DataType  string   `json:"data_type" jsonschema:"Target data type: uint16,int16,uint32,int32,float32,string"`
+	ByteOrder *string  `json:"byte_order,omitempty" jsonschema:"Optional byte order: big or little"`
+	WordOrder *string  `json:"word_order,omitempty" jsonschema:"Optional word order: msw or lsw (multi-word types)"`
+	Scale     *float64 `json:"scale,omitempty" jsonschema:"Optional multiplier applied to decoded numeric value"`
+	Offset    *float64 `json:"offset,omitempty" jsonschema:"Optional additive offset applied to decoded numeric value"`
+	SlaveID   *uint8   `json:"slave_id,omitempty" jsonschema:"Optional Modbus Slave ID (defaults to 1)"`
+}
+
 type ReadTagArgs struct {
 	Name    string `json:"name" jsonschema:"Configured tag name to read"`
 	SlaveID *uint8 `json:"slave_id,omitempty" jsonschema:"Optional Modbus Slave ID override"`

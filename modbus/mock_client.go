@@ -37,7 +37,20 @@ func (m *mockClient) ReadCoils(address, quantity uint16) ([]byte, error) {
 }
 
 func (m *mockClient) ReadDiscreteInputs(address, quantity uint16) ([]byte, error) {
-	return nil, fmt.Errorf("mock: ReadDiscreteInputs not implemented")
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if err := m.validateRange(address, quantity, len(m.coils), "discrete inputs"); err != nil {
+		return nil, err
+	}
+
+	byteCount := (int(quantity) + 7) / 8
+	out := make([]byte, byteCount)
+	for i := 0; i < int(quantity); i++ {
+		if m.coils[int(address)+i] {
+			out[i/8] |= 1 << uint(i%8)
+		}
+	}
+	return out, nil
 }
 
 func (m *mockClient) WriteSingleCoil(address, value uint16) ([]byte, error) {
@@ -71,7 +84,17 @@ func (m *mockClient) WriteMultipleCoils(address, quantity uint16, value []byte) 
 }
 
 func (m *mockClient) ReadInputRegisters(address, quantity uint16) ([]byte, error) {
-	return nil, fmt.Errorf("mock: ReadInputRegisters not implemented")
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if err := m.validateRange(address, quantity, len(m.registers), "input registers"); err != nil {
+		return nil, err
+	}
+
+	out := make([]byte, int(quantity)*2)
+	for i := 0; i < int(quantity); i++ {
+		binary.BigEndian.PutUint16(out[i*2:i*2+2], m.registers[int(address)+i])
+	}
+	return out, nil
 }
 
 func (m *mockClient) ReadHoldingRegisters(address, quantity uint16) ([]byte, error) {
