@@ -73,7 +73,7 @@ func applyByteOrder(word uint16, byteOrder string) uint16 {
 
 func applyScaleOffset(v float64, tag TagDef) float64 {
 	scale := tag.Scale
-	if scale == 0 {
+	if !tag.ScaleSet {
 		scale = 1
 	}
 	return v*scale + tag.Offset
@@ -81,7 +81,7 @@ func applyScaleOffset(v float64, tag TagDef) float64 {
 
 func removeScaleOffset(v float64, tag TagDef) (float64, error) {
 	scale := tag.Scale
-	if scale == 0 {
+	if !tag.ScaleSet {
 		scale = 1
 	}
 	if scale == 0 {

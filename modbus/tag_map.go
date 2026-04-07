@@ -35,6 +35,7 @@ type TagDef struct {
 	Scale       float64   `json:"scale,omitempty"`
 	Offset      float64   `json:"offset,omitempty"`
 	Description string    `json:"description,omitempty"`
+	ScaleSet    bool      `json:"-"`
 }
 
 type TagMap struct {
@@ -68,7 +69,7 @@ func NewTagMap(tags []TagDef) (*TagMap, error) {
 		if tag.Kind == TagKindHolding && tag.DataType == "" {
 			tag.DataType = "uint16"
 		}
-		if tag.Scale == 0 {
+		if !tag.ScaleSet {
 			tag.Scale = 1
 		}
 

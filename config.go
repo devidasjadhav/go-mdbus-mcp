@@ -42,18 +42,18 @@ type WritePolicyConfig struct {
 }
 
 type TagConfig struct {
-	Name        string  `json:"name" yaml:"name"`
-	Kind        string  `json:"kind" yaml:"kind"`
-	Address     uint16  `json:"address" yaml:"address"`
-	Quantity    uint16  `json:"quantity" yaml:"quantity"`
-	SlaveID     *uint8  `json:"slave_id,omitempty" yaml:"slave_id,omitempty"`
-	Access      string  `json:"access" yaml:"access"`
-	DataType    string  `json:"data_type,omitempty" yaml:"data_type,omitempty"`
-	ByteOrder   string  `json:"byte_order,omitempty" yaml:"byte_order,omitempty"`
-	WordOrder   string  `json:"word_order,omitempty" yaml:"word_order,omitempty"`
-	Scale       float64 `json:"scale,omitempty" yaml:"scale,omitempty"`
-	Offset      float64 `json:"offset,omitempty" yaml:"offset,omitempty"`
-	Description string  `json:"description,omitempty" yaml:"description,omitempty"`
+	Name        string   `json:"name" yaml:"name"`
+	Kind        string   `json:"kind" yaml:"kind"`
+	Address     uint16   `json:"address" yaml:"address"`
+	Quantity    uint16   `json:"quantity" yaml:"quantity"`
+	SlaveID     *uint8   `json:"slave_id,omitempty" yaml:"slave_id,omitempty"`
+	Access      string   `json:"access" yaml:"access"`
+	DataType    string   `json:"data_type,omitempty" yaml:"data_type,omitempty"`
+	ByteOrder   string   `json:"byte_order,omitempty" yaml:"byte_order,omitempty"`
+	WordOrder   string   `json:"word_order,omitempty" yaml:"word_order,omitempty"`
+	Scale       *float64 `json:"scale,omitempty" yaml:"scale,omitempty"`
+	Offset      *float64 `json:"offset,omitempty" yaml:"offset,omitempty"`
+	Description string   `json:"description,omitempty" yaml:"description,omitempty"`
 }
 
 func loadAppConfig(path string) (*AppConfig, error) {
@@ -192,6 +192,17 @@ func toTagMap(cfg *AppConfig, csvPath string) (*modbus.TagMap, error) {
 
 	tags := make([]modbus.TagDef, 0, len(cfg.Tags))
 	for _, t := range cfg.Tags {
+		scale := 1.0
+		scaleSet := false
+		if t.Scale != nil {
+			scale = *t.Scale
+			scaleSet = true
+		}
+		offset := 0.0
+		if t.Offset != nil {
+			offset = *t.Offset
+		}
+
 		tags = append(tags, modbus.TagDef{
 			Name:        t.Name,
 			Kind:        modbus.TagKind(t.Kind),
@@ -202,8 +213,9 @@ func toTagMap(cfg *AppConfig, csvPath string) (*modbus.TagMap, error) {
 			DataType:    t.DataType,
 			ByteOrder:   t.ByteOrder,
 			WordOrder:   t.WordOrder,
-			Scale:       t.Scale,
-			Offset:      t.Offset,
+			Scale:       scale,
+			Offset:      offset,
+			ScaleSet:    scaleSet,
 			Description: t.Description,
 		})
 	}
@@ -271,13 +283,15 @@ func loadTagsFromCSV(path string) ([]modbus.TagDef, error) {
 			slaveID = &sv
 		}
 
-		scale := 0.0
+		scale := 1.0
+		scaleSet := false
 		if scaleRaw := strings.TrimSpace(cell(row, headers, "scale")); scaleRaw != "" {
 			s, err := strconv.ParseFloat(scaleRaw, 64)
 			if err != nil {
 				return nil, fmt.Errorf("row %d invalid scale: %w", rowNum, err)
 			}
 			scale = s
+			scaleSet = true
 		}
 
 		offset := 0.0
@@ -301,6 +315,7 @@ func loadTagsFromCSV(path string) ([]modbus.TagDef, error) {
 			WordOrder:   cell(row, headers, "word_order"),
 			Scale:       scale,
 			Offset:      offset,
+			ScaleSet:    scaleSet,
 			Description: cell(row, headers, "description"),
 		})
 	}
