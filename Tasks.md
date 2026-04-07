@@ -21,13 +21,13 @@ Commit target:
 
 Goal: reduce coupling in `main.go` and make transport/runtime wiring replaceable.
 
-- [ ] Move config loading/validation into `internal/config` package.
-- [ ] Add config schema fields for driver and bus mode:
+- [x] Move config loading/validation into `internal/config` package.
+- [x] Add config schema fields for driver and bus mode:
   - `modbus_driver` (`goburrow|simonvetter`)
   - `modbus_mode` (`tcp|rtu`)
-- [ ] Add RTU serial config fields (port, baud rate, parity, data bits, stop bits).
-- [ ] Add thin MCP runtime wrapper package (`internal/mcpserver`) to isolate SDK-specific transport wiring.
-- [ ] Keep CLI flag precedence and existing behavior.
+- [x] Add RTU serial config fields (port, baud rate, parity, data bits, stop bits).
+- [x] Add thin MCP runtime wrapper package (`internal/mcpserver`) to isolate SDK-specific transport wiring.
+- [x] Keep CLI flag precedence and existing behavior.
 
 Commit target:
 

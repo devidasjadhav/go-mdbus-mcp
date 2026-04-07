@@ -2,11 +2,9 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"os/signal"
 	"os/user"
@@ -15,7 +13,9 @@ import (
 	"syscall"
 	"time"
 
+	appconfig "github.com/devidasjadhav/go-mdbus-mcp/internal/config"
 	"github.com/devidasjadhav/go-mdbus-mcp/internal/logx"
+	"github.com/devidasjadhav/go-mdbus-mcp/internal/mcpserver"
 	"github.com/devidasjadhav/go-mdbus-mcp/modbus"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -28,6 +28,13 @@ func main() {
 
 	configPath := flag.String("config", "", "Path to YAML/JSON config file")
 	tagMapCSV := flag.String("tag-map-csv", "", "Path to CSV tag mapping file")
+	modbusDriver := flag.String("modbus-driver", "goburrow", "Modbus driver to use: goburrow|simonvetter")
+	modbusMode := flag.String("modbus-mode", "tcp", "Modbus mode to use: tcp|rtu")
+	serialPort := flag.String("serial-port", "", "Serial device path for RTU mode (e.g. /dev/ttyUSB0)")
+	baudRate := flag.Int("baud-rate", 9600, "RTU baud rate")
+	dataBits := flag.Int("data-bits", 8, "RTU data bits")
+	parity := flag.String("parity", "N", "RTU parity: N|E|O")
+	stopBits := flag.Int("stop-bits", 1, "RTU stop bits")
 	modbusIP := flag.String("modbus-ip", "192.168.1.22", "Modbus server IP address")
 	modbusPort := flag.Int("modbus-port", 5002, "Modbus server port")
 	modbusTimeout := flag.Duration("modbus-timeout", 10*time.Second, "Modbus request timeout (e.g. 10s)")
@@ -44,7 +51,14 @@ func main() {
 	showVersion := flag.Bool("version", false, "Show version information")
 	flag.Parse()
 
-	runtimeOpts := RuntimeOptions{
+	runtimeOpts := appconfig.RuntimeOptions{
+		ModbusDriver:        *modbusDriver,
+		ModbusMode:          *modbusMode,
+		SerialPort:          *serialPort,
+		BaudRate:            *baudRate,
+		DataBits:            *dataBits,
+		Parity:              *parity,
+		StopBits:            *stopBits,
 		ModbusIP:            *modbusIP,
 		ModbusPort:          *modbusPort,
 		ModbusTimeout:       *modbusTimeout,
@@ -65,14 +79,14 @@ func main() {
 		setFlags[f.Name] = true
 	})
 
-	var fileCfg *AppConfig
+	var fileCfg *appconfig.AppConfig
 	if strings.TrimSpace(*configPath) != "" {
-		cfg, err := loadAppConfig(*configPath)
+		cfg, err := appconfig.LoadAppConfig(*configPath)
 		if err != nil {
 			log.Fatalf("Failed to load config: %v", err)
 		}
 		fileCfg = cfg
-		if err := applyConfigOverrides(fileCfg, setFlags, &runtimeOpts); err != nil {
+		if err := appconfig.ApplyConfigOverrides(fileCfg, setFlags, &runtimeOpts); err != nil {
 			log.Fatalf("Invalid config value: %v", err)
 		}
 		if fileCfg.TagMapCSV != nil && !setFlags["tag-map-csv"] {
@@ -87,14 +101,25 @@ func main() {
 	}
 
 	fmt.Fprintf(os.Stderr, "🚀 Modbus MCP Server v%s\n", version)
+	fmt.Fprintf(os.Stderr, "🧩 Driver=%s Mode=%s\n", runtimeOpts.ModbusDriver, runtimeOpts.ModbusMode)
 	fmt.Fprintf(os.Stderr, "📡 Connecting to Modbus server at %s:%d\n", runtimeOpts.ModbusIP, runtimeOpts.ModbusPort)
 	fmt.Fprintf(os.Stderr, "🔌 Using %s transport\n", runtimeOpts.Transport)
+	if runtimeOpts.ModbusMode == "rtu" {
+		fmt.Fprintf(os.Stderr, "🔌 RTU serial settings: port=%s baud=%d dataBits=%d parity=%s stopBits=%d\n", runtimeOpts.SerialPort, runtimeOpts.BaudRate, runtimeOpts.DataBits, runtimeOpts.Parity, runtimeOpts.StopBits)
+	}
 	if runtimeOpts.MockMode {
 		fmt.Fprintf(os.Stderr, "🧪 Mock mode enabled (registers=%d, coils=%d)\n", runtimeOpts.MockRegisters, runtimeOpts.MockCoils)
 	}
 
 	// Create Modbus client
 	modbusClient := modbus.NewModbusClient(&modbus.Config{
+		Driver:           runtimeOpts.ModbusDriver,
+		Mode:             runtimeOpts.ModbusMode,
+		SerialPort:       runtimeOpts.SerialPort,
+		BaudRate:         runtimeOpts.BaudRate,
+		DataBits:         runtimeOpts.DataBits,
+		Parity:           runtimeOpts.Parity,
+		StopBits:         runtimeOpts.StopBits,
 		ModbusIP:         runtimeOpts.ModbusIP,
 		ModbusPort:       runtimeOpts.ModbusPort,
 		Timeout:          runtimeOpts.ModbusTimeout,
@@ -121,12 +146,12 @@ func main() {
 		Version: version,
 	}, nil)
 
-	writePolicy, err := modbus.LoadWritePolicy(toWritePolicyOverrides(fileCfg))
+	writePolicy, err := modbus.LoadWritePolicy(appconfig.ToWritePolicyOverrides(fileCfg))
 	if err != nil {
 		log.Fatalf("Invalid write policy configuration: %v", err)
 	}
 
-	tagMap, err := toTagMap(fileCfg, *tagMapCSV)
+	tagMap, err := appconfig.ToTagMap(fileCfg, *tagMapCSV)
 	if err != nil {
 		log.Fatalf("Invalid tag configuration: %v", err)
 	}
@@ -147,90 +172,11 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	var runErr error
-
-	switch runtimeOpts.Transport {
-	case "stdio":
-		fmt.Fprintln(os.Stderr, "Starting stdio transport...")
-		runErr = s.Run(ctx, &mcp.StdioTransport{})
-
-	case "sse":
-		fmt.Fprintln(os.Stderr, "Starting SSE transport on :8080...")
-		sseHandler := mcp.NewSSEHandler(func(req *http.Request) *mcp.Server { return s }, nil)
-
-		mux := http.NewServeMux()
-		mux.Handle("/sse", sseHandler)
-		mux.Handle("/message", sseHandler)
-
-		setupHealthCheck(mux)
-		httpServer := &http.Server{
-			Addr:    "0.0.0.0:8080",
-			Handler: mux,
-		}
-
-		go func() {
-			<-ctx.Done()
-			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			if err := httpServer.Shutdown(shutdownCtx); err != nil {
-				log.Printf("SSE HTTP shutdown error: %v", err)
-			}
-		}()
-
-		runErr = httpServer.ListenAndServe()
-		if runErr == http.ErrServerClosed {
-			runErr = nil
-		}
-
-	default: // "streamable" or anything else
-		fmt.Fprintln(os.Stderr, "Starting Streamable HTTP transport on :8080...")
-		streamableHandler := mcp.NewStreamableHTTPHandler(
-			func(req *http.Request) *mcp.Server { return s },
-			&mcp.StreamableHTTPOptions{
-				Stateless:    true,
-				JSONResponse: true,
-			},
-		)
-
-		mux := http.NewServeMux()
-		mux.Handle("/mcp", streamableHandler)
-
-		setupHealthCheck(mux)
-		httpServer := &http.Server{
-			Addr:    "0.0.0.0:8080",
-			Handler: mux,
-		}
-
-		go func() {
-			<-ctx.Done()
-			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			if err := httpServer.Shutdown(shutdownCtx); err != nil {
-				log.Printf("Streamable HTTP shutdown error: %v", err)
-			}
-		}()
-
-		runErr = httpServer.ListenAndServe()
-		if runErr == http.ErrServerClosed {
-			runErr = nil
-		}
-	}
+	runErr := mcpserver.Run(ctx, runtimeOpts.Transport, s, version)
 
 	if runErr != nil {
 		log.Printf("Server error: %v", runErr)
 	}
-}
-
-func setupHealthCheck(mux *http.ServeMux) {
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"status":  "healthy",
-			"version": version,
-			"service": "modbus-mcp-server",
-		})
-	})
 }
 
 func resolveConfigRelativePath(configPath string, candidate string) string {

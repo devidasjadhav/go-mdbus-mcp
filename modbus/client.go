@@ -47,6 +47,13 @@ type ClientStatus struct {
 
 // Config holds the configuration for the Modbus client
 type Config struct {
+	Driver           string
+	Mode             string
+	SerialPort       string
+	BaudRate         int
+	DataBits         int
+	Parity           string
+	StopBits         int
 	ModbusIP         string
 	ModbusPort       int
 	Timeout          time.Duration

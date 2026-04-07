@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"encoding/csv"
@@ -15,6 +15,13 @@ import (
 )
 
 type AppConfig struct {
+	ModbusDriver        *string `json:"modbus_driver" yaml:"modbus_driver"`
+	ModbusMode          *string `json:"modbus_mode" yaml:"modbus_mode"`
+	SerialPort          *string `json:"serial_port" yaml:"serial_port"`
+	BaudRate            *int    `json:"baud_rate" yaml:"baud_rate"`
+	DataBits            *int    `json:"data_bits" yaml:"data_bits"`
+	Parity              *string `json:"parity" yaml:"parity"`
+	StopBits            *int    `json:"stop_bits" yaml:"stop_bits"`
 	ModbusIP            *string `json:"modbus_ip" yaml:"modbus_ip"`
 	ModbusPort          *int    `json:"modbus_port" yaml:"modbus_port"`
 	ModbusTimeout       *string `json:"modbus_timeout" yaml:"modbus_timeout"`
@@ -57,6 +64,13 @@ type TagConfig struct {
 }
 
 type RuntimeOptions struct {
+	ModbusDriver        string
+	ModbusMode          string
+	SerialPort          string
+	BaudRate            int
+	DataBits            int
+	Parity              string
+	StopBits            int
 	ModbusIP            string
 	ModbusPort          int
 	ModbusTimeout       time.Duration
@@ -72,7 +86,7 @@ type RuntimeOptions struct {
 	Transport           string
 }
 
-func loadAppConfig(path string) (*AppConfig, error) {
+func LoadAppConfig(path string) (*AppConfig, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file %s: %w", path, err)
@@ -100,15 +114,32 @@ func loadAppConfig(path string) (*AppConfig, error) {
 	return &cfg, nil
 }
 
-func applyConfigOverrides(
-	cfg *AppConfig,
-	setFlags map[string]bool,
-	opts *RuntimeOptions,
-) error {
+func ApplyConfigOverrides(cfg *AppConfig, setFlags map[string]bool, opts *RuntimeOptions) error {
 	if cfg == nil || opts == nil {
 		return nil
 	}
 
+	if cfg.ModbusDriver != nil && !setFlags["modbus-driver"] {
+		opts.ModbusDriver = *cfg.ModbusDriver
+	}
+	if cfg.ModbusMode != nil && !setFlags["modbus-mode"] {
+		opts.ModbusMode = *cfg.ModbusMode
+	}
+	if cfg.SerialPort != nil && !setFlags["serial-port"] {
+		opts.SerialPort = *cfg.SerialPort
+	}
+	if cfg.BaudRate != nil && !setFlags["baud-rate"] {
+		opts.BaudRate = *cfg.BaudRate
+	}
+	if cfg.DataBits != nil && !setFlags["data-bits"] {
+		opts.DataBits = *cfg.DataBits
+	}
+	if cfg.Parity != nil && !setFlags["parity"] {
+		opts.Parity = *cfg.Parity
+	}
+	if cfg.StopBits != nil && !setFlags["stop-bits"] {
+		opts.StopBits = *cfg.StopBits
+	}
 	if cfg.ModbusIP != nil && !setFlags["modbus-ip"] {
 		opts.ModbusIP = *cfg.ModbusIP
 	}
@@ -169,7 +200,7 @@ func applyConfigOverrides(
 	return nil
 }
 
-func toWritePolicyOverrides(cfg *AppConfig) *modbus.WritePolicyOverrides {
+func ToWritePolicyOverrides(cfg *AppConfig) *modbus.WritePolicyOverrides {
 	if cfg == nil || cfg.WritePolicy == nil {
 		return nil
 	}
@@ -181,7 +212,7 @@ func toWritePolicyOverrides(cfg *AppConfig) *modbus.WritePolicyOverrides {
 	}
 }
 
-func toTagMap(cfg *AppConfig, csvPath string) (*modbus.TagMap, error) {
+func ToTagMap(cfg *AppConfig, csvPath string) (*modbus.TagMap, error) {
 	if strings.TrimSpace(csvPath) != "" {
 		tags, err := loadTagsFromCSV(csvPath)
 		if err != nil {

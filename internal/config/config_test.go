@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"os"
@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func TestApplyConfigOverrides_RespectsFlagPrecedence(t *testing.T) {
+func TestApplyConfigOverridesRespectsFlagPrecedence(t *testing.T) {
 	cfg := &AppConfig{
 		ModbusIP:      ptr("10.0.0.10"),
 		ModbusPort:    ptr(1502),
@@ -15,41 +15,29 @@ func TestApplyConfigOverrides_RespectsFlagPrecedence(t *testing.T) {
 		Transport:     ptr("stdio"),
 	}
 
-	modbusIP := ptr("192.168.1.22")
-	modbusPort := ptr(5002)
-	modbusTimeout := ptr(10 * time.Second)
-	modbusIdleTimeout := ptr(2 * time.Second)
-	modbusRetryAttempts := ptr(3)
-	modbusRetryBackoff := ptr(150 * time.Millisecond)
-	modbusRetryOnWrite := ptr(false)
-	modbusCircuitTripAfter := ptr(3)
-	modbusCircuitOpenFor := ptr(2 * time.Second)
-	mockMode := ptr(false)
-	mockRegisters := ptr(1024)
-	mockCoils := ptr(1024)
-	transport := ptr("streamable")
-
-	setFlags := map[string]bool{"modbus-ip": true}
 	opts := &RuntimeOptions{
-		ModbusIP:            *modbusIP,
-		ModbusPort:          *modbusPort,
-		ModbusTimeout:       *modbusTimeout,
-		ModbusIdleTimeout:   *modbusIdleTimeout,
-		ModbusRetryAttempts: *modbusRetryAttempts,
-		ModbusRetryBackoff:  *modbusRetryBackoff,
-		ModbusRetryOnWrite:  *modbusRetryOnWrite,
-		CircuitTripAfter:    *modbusCircuitTripAfter,
-		CircuitOpenFor:      *modbusCircuitOpenFor,
-		MockMode:            *mockMode,
-		MockRegisters:       *mockRegisters,
-		MockCoils:           *mockCoils,
-		Transport:           *transport,
+		ModbusDriver:        "goburrow",
+		ModbusMode:          "tcp",
+		BaudRate:            9600,
+		DataBits:            8,
+		Parity:              "N",
+		StopBits:            1,
+		ModbusIP:            "192.168.1.22",
+		ModbusPort:          5002,
+		ModbusTimeout:       10 * time.Second,
+		ModbusIdleTimeout:   2 * time.Second,
+		ModbusRetryAttempts: 3,
+		ModbusRetryBackoff:  150 * time.Millisecond,
+		ModbusRetryOnWrite:  false,
+		CircuitTripAfter:    3,
+		CircuitOpenFor:      2 * time.Second,
+		MockMode:            false,
+		MockRegisters:       1024,
+		MockCoils:           1024,
+		Transport:           "streamable",
 	}
-	err := applyConfigOverrides(
-		cfg,
-		setFlags,
-		opts,
-	)
+
+	err := ApplyConfigOverrides(cfg, map[string]bool{"modbus-ip": true}, opts)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -68,44 +56,32 @@ func TestApplyConfigOverrides_RespectsFlagPrecedence(t *testing.T) {
 	}
 }
 
-func TestApplyConfigOverrides_InvalidDuration(t *testing.T) {
+func TestApplyConfigOverridesInvalidDuration(t *testing.T) {
 	cfg := &AppConfig{ModbusRetryBackoff: ptr("nope")}
 
-	modbusIP := ptr("192.168.1.22")
-	modbusPort := ptr(5002)
-	modbusTimeout := ptr(10 * time.Second)
-	modbusIdleTimeout := ptr(2 * time.Second)
-	modbusRetryAttempts := ptr(3)
-	modbusRetryBackoff := ptr(150 * time.Millisecond)
-	modbusRetryOnWrite := ptr(false)
-	modbusCircuitTripAfter := ptr(3)
-	modbusCircuitOpenFor := ptr(2 * time.Second)
-	mockMode := ptr(false)
-	mockRegisters := ptr(1024)
-	mockCoils := ptr(1024)
-	transport := ptr("streamable")
-
 	opts := &RuntimeOptions{
-		ModbusIP:            *modbusIP,
-		ModbusPort:          *modbusPort,
-		ModbusTimeout:       *modbusTimeout,
-		ModbusIdleTimeout:   *modbusIdleTimeout,
-		ModbusRetryAttempts: *modbusRetryAttempts,
-		ModbusRetryBackoff:  *modbusRetryBackoff,
-		ModbusRetryOnWrite:  *modbusRetryOnWrite,
-		CircuitTripAfter:    *modbusCircuitTripAfter,
-		CircuitOpenFor:      *modbusCircuitOpenFor,
-		MockMode:            *mockMode,
-		MockRegisters:       *mockRegisters,
-		MockCoils:           *mockCoils,
-		Transport:           *transport,
+		ModbusDriver:        "goburrow",
+		ModbusMode:          "tcp",
+		BaudRate:            9600,
+		DataBits:            8,
+		Parity:              "N",
+		StopBits:            1,
+		ModbusIP:            "192.168.1.22",
+		ModbusPort:          5002,
+		ModbusTimeout:       10 * time.Second,
+		ModbusIdleTimeout:   2 * time.Second,
+		ModbusRetryAttempts: 3,
+		ModbusRetryBackoff:  150 * time.Millisecond,
+		ModbusRetryOnWrite:  false,
+		CircuitTripAfter:    3,
+		CircuitOpenFor:      2 * time.Second,
+		MockMode:            false,
+		MockRegisters:       1024,
+		MockCoils:           1024,
+		Transport:           "streamable",
 	}
 
-	err := applyConfigOverrides(
-		cfg,
-		map[string]bool{},
-		opts,
-	)
+	err := ApplyConfigOverrides(cfg, map[string]bool{}, opts)
 	if err == nil {
 		t.Fatalf("expected invalid duration to fail")
 	}
@@ -118,7 +94,7 @@ func TestToTagMap(t *testing.T) {
 		},
 	}
 
-	tagMap, err := toTagMap(cfg, "")
+	tagMap, err := ToTagMap(cfg, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -130,14 +106,14 @@ func TestToTagMap(t *testing.T) {
 	}
 }
 
-func TestToTagMap_FromCSV(t *testing.T) {
+func TestToTagMapFromCSV(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "tags.csv")
 	csv := "name,kind,address,quantity,access,data_type\nboiler_temp,holding_register,20,2,read,float32\n"
 	if err := os.WriteFile(path, []byte(csv), 0644); err != nil {
 		t.Fatalf("failed to write temp csv: %v", err)
 	}
 
-	tagMap, err := toTagMap(nil, path)
+	tagMap, err := ToTagMap(nil, path)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -153,14 +129,14 @@ func TestToTagMap_FromCSV(t *testing.T) {
 	}
 }
 
-func TestToTagMap_FromCSV_QuantityDerivedFromDataType(t *testing.T) {
+func TestToTagMapFromCSVDeriveQuantity(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "tags.csv")
 	csv := "name,kind,address,access,data_type\nboiler_temp,holding_register,20,read,float32\n"
 	if err := os.WriteFile(path, []byte(csv), 0644); err != nil {
 		t.Fatalf("failed to write temp csv: %v", err)
 	}
 
-	tagMap, err := toTagMap(nil, path)
+	tagMap, err := ToTagMap(nil, path)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -173,14 +149,14 @@ func TestToTagMap_FromCSV_QuantityDerivedFromDataType(t *testing.T) {
 	}
 }
 
-func TestToTagMap_FromCSV_MissingRequiredColumn(t *testing.T) {
+func TestToTagMapFromCSVMissingRequiredColumn(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "tags.csv")
 	csv := "name,kind\nboiler_temp,holding_register\n"
 	if err := os.WriteFile(path, []byte(csv), 0644); err != nil {
 		t.Fatalf("failed to write temp csv: %v", err)
 	}
 
-	if _, err := toTagMap(nil, path); err == nil {
+	if _, err := ToTagMap(nil, path); err == nil {
 		t.Fatalf("expected missing required column error")
 	}
 }
