@@ -56,6 +56,22 @@ type TagConfig struct {
 	Description string   `json:"description,omitempty" yaml:"description,omitempty"`
 }
 
+type RuntimeOptions struct {
+	ModbusIP            string
+	ModbusPort          int
+	ModbusTimeout       time.Duration
+	ModbusIdleTimeout   time.Duration
+	ModbusRetryAttempts int
+	ModbusRetryBackoff  time.Duration
+	ModbusRetryOnWrite  bool
+	CircuitTripAfter    int
+	CircuitOpenFor      time.Duration
+	MockMode            bool
+	MockRegisters       int
+	MockCoils           int
+	Transport           string
+}
+
 func loadAppConfig(path string) (*AppConfig, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -87,50 +103,38 @@ func loadAppConfig(path string) (*AppConfig, error) {
 func applyConfigOverrides(
 	cfg *AppConfig,
 	setFlags map[string]bool,
-	modbusIP *string,
-	modbusPort *int,
-	modbusTimeout *time.Duration,
-	modbusIdleTimeout *time.Duration,
-	modbusRetryAttempts *int,
-	modbusRetryBackoff *time.Duration,
-	modbusRetryOnWrite *bool,
-	modbusCircuitTripAfter *int,
-	modbusCircuitOpenFor *time.Duration,
-	mockMode *bool,
-	mockRegisters *int,
-	mockCoils *int,
-	transportFlag *string,
+	opts *RuntimeOptions,
 ) error {
-	if cfg == nil {
+	if cfg == nil || opts == nil {
 		return nil
 	}
 
 	if cfg.ModbusIP != nil && !setFlags["modbus-ip"] {
-		*modbusIP = *cfg.ModbusIP
+		opts.ModbusIP = *cfg.ModbusIP
 	}
 	if cfg.ModbusPort != nil && !setFlags["modbus-port"] {
-		*modbusPort = *cfg.ModbusPort
+		opts.ModbusPort = *cfg.ModbusPort
 	}
 	if cfg.ModbusRetryAttempts != nil && !setFlags["modbus-retry-attempts"] {
-		*modbusRetryAttempts = *cfg.ModbusRetryAttempts
+		opts.ModbusRetryAttempts = *cfg.ModbusRetryAttempts
 	}
 	if cfg.ModbusRetryOnWrite != nil && !setFlags["modbus-retry-on-write"] {
-		*modbusRetryOnWrite = *cfg.ModbusRetryOnWrite
+		opts.ModbusRetryOnWrite = *cfg.ModbusRetryOnWrite
 	}
 	if cfg.CircuitTripAfter != nil && !setFlags["modbus-circuit-trip-after"] {
-		*modbusCircuitTripAfter = *cfg.CircuitTripAfter
+		opts.CircuitTripAfter = *cfg.CircuitTripAfter
 	}
 	if cfg.Transport != nil && !setFlags["transport"] {
-		*transportFlag = *cfg.Transport
+		opts.Transport = *cfg.Transport
 	}
 	if cfg.MockMode != nil && !setFlags["mock-mode"] {
-		*mockMode = *cfg.MockMode
+		opts.MockMode = *cfg.MockMode
 	}
 	if cfg.MockRegisters != nil && !setFlags["mock-registers"] {
-		*mockRegisters = *cfg.MockRegisters
+		opts.MockRegisters = *cfg.MockRegisters
 	}
 	if cfg.MockCoils != nil && !setFlags["mock-coils"] {
-		*mockCoils = *cfg.MockCoils
+		opts.MockCoils = *cfg.MockCoils
 	}
 
 	if cfg.ModbusTimeout != nil && !setFlags["modbus-timeout"] {
@@ -138,28 +142,28 @@ func applyConfigOverrides(
 		if err != nil {
 			return fmt.Errorf("invalid modbus_timeout %q: %w", *cfg.ModbusTimeout, err)
 		}
-		*modbusTimeout = v
+		opts.ModbusTimeout = v
 	}
 	if cfg.ModbusIdleTimeout != nil && !setFlags["modbus-idle-timeout"] {
 		v, err := time.ParseDuration(*cfg.ModbusIdleTimeout)
 		if err != nil {
 			return fmt.Errorf("invalid modbus_idle_timeout %q: %w", *cfg.ModbusIdleTimeout, err)
 		}
-		*modbusIdleTimeout = v
+		opts.ModbusIdleTimeout = v
 	}
 	if cfg.ModbusRetryBackoff != nil && !setFlags["modbus-retry-backoff"] {
 		v, err := time.ParseDuration(*cfg.ModbusRetryBackoff)
 		if err != nil {
 			return fmt.Errorf("invalid modbus_retry_backoff %q: %w", *cfg.ModbusRetryBackoff, err)
 		}
-		*modbusRetryBackoff = v
+		opts.ModbusRetryBackoff = v
 	}
 	if cfg.CircuitOpenFor != nil && !setFlags["modbus-circuit-open-for"] {
 		v, err := time.ParseDuration(*cfg.CircuitOpenFor)
 		if err != nil {
 			return fmt.Errorf("invalid modbus_circuit_open_for %q: %w", *cfg.CircuitOpenFor, err)
 		}
-		*modbusCircuitOpenFor = v
+		opts.CircuitOpenFor = v
 	}
 
 	return nil

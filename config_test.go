@@ -30,37 +30,40 @@ func TestApplyConfigOverrides_RespectsFlagPrecedence(t *testing.T) {
 	transport := ptr("streamable")
 
 	setFlags := map[string]bool{"modbus-ip": true}
+	opts := &RuntimeOptions{
+		ModbusIP:            *modbusIP,
+		ModbusPort:          *modbusPort,
+		ModbusTimeout:       *modbusTimeout,
+		ModbusIdleTimeout:   *modbusIdleTimeout,
+		ModbusRetryAttempts: *modbusRetryAttempts,
+		ModbusRetryBackoff:  *modbusRetryBackoff,
+		ModbusRetryOnWrite:  *modbusRetryOnWrite,
+		CircuitTripAfter:    *modbusCircuitTripAfter,
+		CircuitOpenFor:      *modbusCircuitOpenFor,
+		MockMode:            *mockMode,
+		MockRegisters:       *mockRegisters,
+		MockCoils:           *mockCoils,
+		Transport:           *transport,
+	}
 	err := applyConfigOverrides(
 		cfg,
 		setFlags,
-		modbusIP,
-		modbusPort,
-		modbusTimeout,
-		modbusIdleTimeout,
-		modbusRetryAttempts,
-		modbusRetryBackoff,
-		modbusRetryOnWrite,
-		modbusCircuitTripAfter,
-		modbusCircuitOpenFor,
-		mockMode,
-		mockRegisters,
-		mockCoils,
-		transport,
+		opts,
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if *modbusIP != "192.168.1.22" {
+	if opts.ModbusIP != "192.168.1.22" {
 		t.Fatalf("expected CLI flag value to win for modbus-ip")
 	}
-	if *modbusPort != 1502 {
+	if opts.ModbusPort != 1502 {
 		t.Fatalf("expected config to set modbus-port")
 	}
-	if *modbusTimeout != 3*time.Second {
+	if opts.ModbusTimeout != 3*time.Second {
 		t.Fatalf("expected config to set modbus-timeout")
 	}
-	if *transport != "stdio" {
+	if opts.Transport != "stdio" {
 		t.Fatalf("expected config to set transport")
 	}
 }
@@ -82,22 +85,26 @@ func TestApplyConfigOverrides_InvalidDuration(t *testing.T) {
 	mockCoils := ptr(1024)
 	transport := ptr("streamable")
 
+	opts := &RuntimeOptions{
+		ModbusIP:            *modbusIP,
+		ModbusPort:          *modbusPort,
+		ModbusTimeout:       *modbusTimeout,
+		ModbusIdleTimeout:   *modbusIdleTimeout,
+		ModbusRetryAttempts: *modbusRetryAttempts,
+		ModbusRetryBackoff:  *modbusRetryBackoff,
+		ModbusRetryOnWrite:  *modbusRetryOnWrite,
+		CircuitTripAfter:    *modbusCircuitTripAfter,
+		CircuitOpenFor:      *modbusCircuitOpenFor,
+		MockMode:            *mockMode,
+		MockRegisters:       *mockRegisters,
+		MockCoils:           *mockCoils,
+		Transport:           *transport,
+	}
+
 	err := applyConfigOverrides(
 		cfg,
 		map[string]bool{},
-		modbusIP,
-		modbusPort,
-		modbusTimeout,
-		modbusIdleTimeout,
-		modbusRetryAttempts,
-		modbusRetryBackoff,
-		modbusRetryOnWrite,
-		modbusCircuitTripAfter,
-		modbusCircuitOpenFor,
-		mockMode,
-		mockRegisters,
-		mockCoils,
-		transport,
+		opts,
 	)
 	if err == nil {
 		t.Fatalf("expected invalid duration to fail")

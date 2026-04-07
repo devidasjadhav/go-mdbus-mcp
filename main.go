@@ -43,6 +43,22 @@ func main() {
 	showVersion := flag.Bool("version", false, "Show version information")
 	flag.Parse()
 
+	runtimeOpts := RuntimeOptions{
+		ModbusIP:            *modbusIP,
+		ModbusPort:          *modbusPort,
+		ModbusTimeout:       *modbusTimeout,
+		ModbusIdleTimeout:   *modbusIdleTimeout,
+		ModbusRetryAttempts: *modbusRetryAttempts,
+		ModbusRetryBackoff:  *modbusRetryBackoff,
+		ModbusRetryOnWrite:  *modbusRetryOnWrite,
+		CircuitTripAfter:    *modbusCircuitTripAfter,
+		CircuitOpenFor:      *modbusCircuitOpenFor,
+		MockMode:            *mockMode,
+		MockRegisters:       *mockRegisters,
+		MockCoils:           *mockCoils,
+		Transport:           *transportFlag,
+	}
+
 	setFlags := map[string]bool{}
 	flag.Visit(func(f *flag.Flag) {
 		setFlags[f.Name] = true
@@ -55,7 +71,7 @@ func main() {
 			log.Fatalf("Failed to load config: %v", err)
 		}
 		fileCfg = cfg
-		if err := applyConfigOverrides(fileCfg, setFlags, modbusIP, modbusPort, modbusTimeout, modbusIdleTimeout, modbusRetryAttempts, modbusRetryBackoff, modbusRetryOnWrite, modbusCircuitTripAfter, modbusCircuitOpenFor, mockMode, mockRegisters, mockCoils, transportFlag); err != nil {
+		if err := applyConfigOverrides(fileCfg, setFlags, &runtimeOpts); err != nil {
 			log.Fatalf("Invalid config value: %v", err)
 		}
 		if fileCfg.TagMapCSV != nil && !setFlags["tag-map-csv"] {
@@ -70,27 +86,27 @@ func main() {
 	}
 
 	fmt.Fprintf(os.Stderr, "🚀 Modbus MCP Server v%s\n", version)
-	fmt.Fprintf(os.Stderr, "📡 Connecting to Modbus server at %s:%d\n", *modbusIP, *modbusPort)
-	fmt.Fprintf(os.Stderr, "🔌 Using %s transport\n", *transportFlag)
-	if *mockMode {
-		fmt.Fprintf(os.Stderr, "🧪 Mock mode enabled (registers=%d, coils=%d)\n", *mockRegisters, *mockCoils)
+	fmt.Fprintf(os.Stderr, "📡 Connecting to Modbus server at %s:%d\n", runtimeOpts.ModbusIP, runtimeOpts.ModbusPort)
+	fmt.Fprintf(os.Stderr, "🔌 Using %s transport\n", runtimeOpts.Transport)
+	if runtimeOpts.MockMode {
+		fmt.Fprintf(os.Stderr, "🧪 Mock mode enabled (registers=%d, coils=%d)\n", runtimeOpts.MockRegisters, runtimeOpts.MockCoils)
 	}
 
 	// Create Modbus client
 	modbusClient := modbus.NewModbusClient(&modbus.Config{
-		ModbusIP:         *modbusIP,
-		ModbusPort:       *modbusPort,
-		Timeout:          *modbusTimeout,
-		IdleTimeout:      *modbusIdleTimeout,
+		ModbusIP:         runtimeOpts.ModbusIP,
+		ModbusPort:       runtimeOpts.ModbusPort,
+		Timeout:          runtimeOpts.ModbusTimeout,
+		IdleTimeout:      runtimeOpts.ModbusIdleTimeout,
 		DefaultSlaveID:   1,
-		RetryAttempts:    *modbusRetryAttempts,
-		RetryBackoff:     *modbusRetryBackoff,
-		RetryOnWrite:     *modbusRetryOnWrite,
-		CircuitTripAfter: *modbusCircuitTripAfter,
-		CircuitOpenFor:   *modbusCircuitOpenFor,
-		UseMock:          *mockMode,
-		MockRegisters:    *mockRegisters,
-		MockCoils:        *mockCoils,
+		RetryAttempts:    runtimeOpts.ModbusRetryAttempts,
+		RetryBackoff:     runtimeOpts.ModbusRetryBackoff,
+		RetryOnWrite:     runtimeOpts.ModbusRetryOnWrite,
+		CircuitTripAfter: runtimeOpts.CircuitTripAfter,
+		CircuitOpenFor:   runtimeOpts.CircuitOpenFor,
+		UseMock:          runtimeOpts.MockMode,
+		MockRegisters:    runtimeOpts.MockRegisters,
+		MockCoils:        runtimeOpts.MockCoils,
 	})
 	defer func() {
 		if err := modbusClient.Close(); err != nil {
@@ -121,7 +137,7 @@ func main() {
 	} else {
 		fmt.Fprintln(os.Stderr, "🔒 Modbus writes are DISABLED by default (set MODBUS_WRITES_ENABLED=true to allow writes)")
 	}
-	emitSecurityWarnings(*modbusPort, *mockMode, writePolicy)
+	emitSecurityWarnings(runtimeOpts.ModbusPort, runtimeOpts.MockMode, writePolicy)
 
 	// Register tools natively with the SDK
 	modbus.RegisterTools(s, modbusClient, writePolicy, tagMap)
@@ -132,7 +148,7 @@ func main() {
 
 	var runErr error
 
-	switch *transportFlag {
+	switch runtimeOpts.Transport {
 	case "stdio":
 		fmt.Fprintln(os.Stderr, "Starting stdio transport...")
 		runErr = s.Run(ctx, &mcp.StdioTransport{})
