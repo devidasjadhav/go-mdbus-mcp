@@ -1,4 +1,4 @@
-.PHONY: help build test clean docker-build run run-streamable run-stdio run-sse
+.PHONY: help build test bench clean docker-build run run-streamable run-stdio run-sse
 
 BINARY := modbus-server
 MODBUS_IP ?=
@@ -24,6 +24,7 @@ help:
 	@echo "Available commands:"
 	@echo "  build         Build the binary"
 	@echo "  test          Run tests"
+	@echo "  bench         Run benchmark suite (mock mode)"
 	@echo "  clean         Clean build artifacts"
 	@echo "  docker-build  Build Docker image"
 	@echo "  run           Run server (configurable args)"
@@ -50,6 +51,9 @@ build:
 
 test:
 	go test -v ./...
+
+bench:
+	go test -bench=. -benchmem ./modbus
 
 clean:
 	rm -f $(BINARY)

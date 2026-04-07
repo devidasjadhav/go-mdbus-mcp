@@ -154,4 +154,5 @@ Standard Go toolchains are used. The heavy lifting is done via the `modbus` fold
 
 ```bash
 go test ./...
+make bench
 ```

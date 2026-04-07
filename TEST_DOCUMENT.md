@@ -288,3 +288,33 @@ Scope validated:
 ## Conclusion (Phase 1-5)
 
 The server now includes a deterministic in-memory mock path for development and CI, reducing dependence on physical hardware for core tool validation.
+
+## Phase 6: Benchmark Harness (Mock Path)
+
+Date: 2026-04-07
+
+Scope validated:
+
+- Added benchmark suite in `modbus/benchmark_test.go`
+- Added `make bench` target for repeatable benchmark runs
+- Captured baseline numbers for mock-mode execution path
+
+### Test Log
+
+1) Benchmark execution
+
+- Command:
+  - `go test -bench=. -benchmem ./modbus`
+- Actual baseline on this environment:
+  - `BenchmarkMockRead4Registers-12`: `29.65 ns/op`, `8 B/op`, `1 allocs/op`
+  - `BenchmarkMockWriteAndReadVerify-12`: `42.63 ns/op`, `8 B/op`, `2 allocs/op`
+- Result: PASS
+
+Note:
+
+- These are mock-path microbenchmarks (in-memory), useful for regression tracking of server overhead.
+- Hardware/network latencies are expected to be significantly higher in real Modbus TCP environments.
+
+## Conclusion (Phase 1-6)
+
+The project now includes safety controls, recovery logic, CSV semantic tags with typed reads/writes, hardware-free mock mode, and a benchmark baseline for regression tracking.
