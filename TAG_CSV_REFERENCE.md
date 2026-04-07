@@ -38,6 +38,11 @@ Coil tags:
 - `string` requires explicit quantity
 - `coil` defaults to quantity `1`
 
+## Scale semantics
+
+- If `scale` is omitted, default scale is `1`.
+- If `scale` is explicitly set to `0`, it is treated as an explicit value (not defaulted).
+
 ## Example
 
 ```csv

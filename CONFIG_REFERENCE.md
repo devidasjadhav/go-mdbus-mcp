@@ -58,3 +58,8 @@ write_policy:
 - `MODBUS_WRITE_ALLOWLIST`
 - `MODBUS_WRITE_ALLOWLIST_HOLDING`
 - `MODBUS_WRITE_ALLOWLIST_COILS`
+
+## Operational cautions
+
+- `modbus_retry_on_write` can retry mutating operations and may not be safe for all PLC workflows.
+- Prefer `modbus_retry_on_write: false` unless operations are idempotent and process-safe.
