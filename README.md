@@ -150,6 +150,8 @@ Detailed usage and OpenCode validation steps are documented in `HOW_TO_USE.md`.
 
 Validated test runs and outcomes are documented in `TEST_DOCUMENT.md`.
 
+Security deployment guidance is documented in `SECURITY.md`.
+
 Standard Go toolchains are used. The heavy lifting is done via the `modbus` folder.
 
 ```bash

@@ -318,3 +318,37 @@ Note:
 ## Conclusion (Phase 1-6)
 
 The project now includes safety controls, recovery logic, CSV semantic tags with typed reads/writes, hardware-free mock mode, and a benchmark baseline for regression tracking.
+
+## Phase 7: Security Hardening Defaults
+
+Date: 2026-04-07
+
+Scope validated:
+
+- Runtime warnings for privileged ports (`<1024`)
+- Runtime warning when writes are enabled without allowlists
+- Added deployment guidance in `SECURITY.md`
+
+### Test Log
+
+1) Privileged port warning
+
+- Command:
+  - `timeout 3 ./modbus-server --transport stdio --modbus-port 502`
+- Expected:
+  - warning about privileged/non-root ports
+- Result: PASS
+
+2) Security documentation
+
+- Added file:
+  - `SECURITY.md`
+- Includes:
+  - least-privilege guidance
+  - write-policy safe defaults
+  - production checklist
+- Result: PASS
+
+## Conclusion (Phase 1-7)
+
+The server now includes operational safety defaults, typed semantic tooling, CI-friendly mock mode, benchmark baseline, and explicit security guidance for production deployment.

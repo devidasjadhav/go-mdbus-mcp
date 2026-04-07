@@ -93,6 +93,13 @@ func (wp *WritePolicy) Enabled() bool {
 	return wp.enabled
 }
 
+func (wp *WritePolicy) HasAllowlist() bool {
+	if wp == nil {
+		return false
+	}
+	return len(wp.holdingRange) > 0 || len(wp.coilsRange) > 0
+}
+
 func (wp *WritePolicy) ValidateHoldingWrite(address uint16, quantity int) error {
 	return wp.validateWrite("holding-register", address, quantity, wp.holdingRange)
 }

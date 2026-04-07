@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"os/user"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -120,6 +121,7 @@ func main() {
 	} else {
 		fmt.Fprintln(os.Stderr, "🔒 Modbus writes are DISABLED by default (set MODBUS_WRITES_ENABLED=true to allow writes)")
 	}
+	emitSecurityWarnings(*modbusPort, *mockMode, writePolicy)
 
 	// Register tools natively with the SDK
 	modbus.RegisterTools(s, modbusClient, writePolicy, tagMap)
@@ -223,4 +225,20 @@ func resolveConfigRelativePath(configPath string, candidate string) string {
 		return candidate
 	}
 	return filepath.Join(filepath.Dir(configPath), candidate)
+}
+
+func emitSecurityWarnings(modbusPort int, mockMode bool, writePolicy *modbus.WritePolicy) {
+	if modbusPort > 0 && modbusPort < 1024 {
+		fmt.Fprintf(os.Stderr, "⚠️  Privileged port %d may require elevated permissions; prefer non-root ports like 1502 when possible.\n", modbusPort)
+	}
+
+	if !mockMode {
+		if currentUser, err := user.Current(); err == nil && currentUser.Uid == "0" {
+			fmt.Fprintln(os.Stderr, "⚠️  Server is running as root. For production, run as a dedicated non-root service account.")
+		}
+	}
+
+	if writePolicy != nil && writePolicy.Enabled() && !writePolicy.HasAllowlist() {
+		fmt.Fprintln(os.Stderr, "⚠️  Writes are enabled without an allowlist. Consider MODBUS_WRITE_ALLOWLIST for safer operation.")
+	}
 }
