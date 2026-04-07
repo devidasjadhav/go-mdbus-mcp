@@ -19,8 +19,10 @@ func TestShouldRetryError(t *testing.T) {
 	}{
 		{name: "nil", err: nil, want: false},
 		{name: "eof", err: errors.New("EOF"), want: true},
+		{name: "eof_lower", err: errors.New("eof"), want: true},
 		{name: "broken_pipe", err: errors.New("write: broken pipe"), want: true},
 		{name: "timeout_net_error", err: timeoutErr{}, want: true},
+		{name: "wrapped_timeout", err: errors.New("wrap: " + timeoutErr{}.Error()), want: true},
 		{name: "random", err: errors.New("permission denied"), want: false},
 	}
 

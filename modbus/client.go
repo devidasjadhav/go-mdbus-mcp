@@ -2,6 +2,7 @@ package modbus
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -210,13 +211,16 @@ func (mc *ModbusClient) Execute(ctx context.Context, slaveID uint8, allowRetry b
 		backoff := mc.backoffForAttempt(attempt)
 		log.Printf("modbus: transient error (attempt %d/%d), retrying in %s: %v", attempt, attempts, backoff, lastErr)
 
+		mc.mu.Unlock()
 		timer := time.NewTimer(backoff)
 		select {
 		case <-ctx.Done():
 			timer.Stop()
+			mc.mu.Lock()
 			return nil, fmt.Errorf("operation canceled during retry backoff: %w", ctx.Err())
 		case <-timer.C:
 		}
+		mc.mu.Lock()
 	}
 
 	mc.recordFailure(lastErr)
@@ -284,13 +288,14 @@ func shouldRetryError(err error) bool {
 	if errorsIsTimeout(err) {
 		return true
 	}
-	msg := err.Error()
+	msg := strings.ToLower(err.Error())
 	if containsAny(msg,
-		"EOF",
+		"eof",
 		"broken pipe",
 		"connection reset by peer",
 		"use of closed network connection",
 		"i/o timeout",
+		"timeout",
 	) {
 		return true
 	}
@@ -298,7 +303,8 @@ func shouldRetryError(err error) bool {
 }
 
 func errorsIsTimeout(err error) bool {
-	if nerr, ok := err.(net.Error); ok && nerr.Timeout() {
+	var nerr net.Error
+	if errors.As(err, &nerr) && nerr.Timeout() {
 		return true
 	}
 	return false

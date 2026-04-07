@@ -308,6 +308,20 @@ func RegisterTools(s *mcp.Server, mc *ModbusClient, writePolicy *WritePolicy, ta
 			targetSlave := resolveSlaveID(args.SlaveID, tag.SlaveID)
 			switch tag.Kind {
 			case TagKindHolding:
+				specified := 0
+				if len(args.HoldingValues) > 0 {
+					specified++
+				}
+				if args.NumericValue != nil {
+					specified++
+				}
+				if args.StringValue != nil {
+					specified++
+				}
+				if specified > 1 {
+					return errorResult("ambiguous input: provide only one of holding_values, numeric_value, string_value"), nil, nil
+				}
+
 				holdingValues := args.HoldingValues
 				if len(holdingValues) == 0 {
 					switch {
@@ -356,6 +370,17 @@ func RegisterTools(s *mcp.Server, mc *ModbusClient, writePolicy *WritePolicy, ta
 				})
 
 			case TagKindCoil:
+				specified := 0
+				if len(args.CoilValues) > 0 {
+					specified++
+				}
+				if args.BoolValue != nil {
+					specified++
+				}
+				if specified > 1 {
+					return errorResult("ambiguous input: provide only one of coil_values or bool_value"), nil, nil
+				}
+
 				coilValues := args.CoilValues
 				if len(coilValues) == 0 {
 					if args.BoolValue != nil {
