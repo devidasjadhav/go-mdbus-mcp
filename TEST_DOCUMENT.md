@@ -352,3 +352,23 @@ Scope validated:
 ## Conclusion (Phase 1-7)
 
 The server now includes operational safety defaults, typed semantic tooling, CI-friendly mock mode, benchmark baseline, and explicit security guidance for production deployment.
+
+## Phase 8: Quality Refactor Pass
+
+Date: 2026-04-07
+
+Scope validated:
+
+- Tool handlers reorganized into focused files by domain
+- Runtime config override flow refactored with `RuntimeOptions`
+- Retry matcher robustness and ambiguity checks in `write-tag`
+
+### Test Log
+
+1) Full suite after refactor
+
+- Command:
+  - `go test ./...`
+- Expected:
+  - no regressions after reorganization
+- Result: PASS

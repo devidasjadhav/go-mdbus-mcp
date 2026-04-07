@@ -158,6 +158,8 @@ Tag CSV schema and typing reference is documented in `TAG_CSV_REFERENCE.md`.
 
 Architecture overview is documented in `ARCHITECTURE.md`.
 
+Detailed review notes and remediation status are documented in `CODE_REVIEW.md`.
+
 Standard Go toolchains are used. The heavy lifting is done via the `modbus` folder.
 
 ```bash

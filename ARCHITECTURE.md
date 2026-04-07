@@ -12,12 +12,17 @@
 ## Core modules
 
 - `main.go`: bootstrap, transport setup, lifecycle
-- `config.go`: config parsing and CSV tag loading
+- `config.go`: config parsing, override application, and CSV tag loading
 - `modbus/client.go`: Modbus client execution, retry/circuit status
 - `modbus/write_policy.go`: write-guarding and allowlists
 - `modbus/tag_map.go`: semantic tag model and validation
 - `modbus/tag_codec.go`: typed decode/encode helpers
-- `modbus/tools.go`: MCP tool handlers
+- `modbus/tools.go`: tool registration entrypoint
+- `modbus/tool_registers.go`: register/coil low-level handlers
+- `modbus/tool_tags.go`: semantic tag handlers
+- `modbus/tool_status.go`: status/diagnostic handlers
+- `modbus/tool_helpers.go`: shared handler helpers
+- `modbus/tool_types.go`: tool arg schemas
 - `modbus/mock_client.go`: deterministic in-memory Modbus implementation
 
 ## Design principles
