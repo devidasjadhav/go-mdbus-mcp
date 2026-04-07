@@ -26,17 +26,41 @@ type WritePolicy struct {
 	coilsRange   []addressRange
 }
 
+// WritePolicyOverrides allows config-file values to override environment policy.
+type WritePolicyOverrides struct {
+	WritesEnabled         *bool
+	WriteAllowlist        *string
+	HoldingWriteAllowlist *string
+	CoilWriteAllowlist    *string
+}
+
 // LoadWritePolicyFromEnv loads write-safety policy from environment variables.
 func LoadWritePolicyFromEnv() (*WritePolicy, error) {
-	enabled := parseEnvBool(envWritesEnabled, false)
+	return LoadWritePolicy(nil)
+}
 
-	globalRanges, err := parseAllowlist(os.Getenv(envWriteAllowlist))
+// LoadWritePolicy loads write-safety policy from env and optional overrides.
+func LoadWritePolicy(overrides *WritePolicyOverrides) (*WritePolicy, error) {
+	enabled := parseEnvBool(envWritesEnabled, false)
+	if overrides != nil && overrides.WritesEnabled != nil {
+		enabled = *overrides.WritesEnabled
+	}
+
+	globalRaw := os.Getenv(envWriteAllowlist)
+	if overrides != nil && overrides.WriteAllowlist != nil {
+		globalRaw = *overrides.WriteAllowlist
+	}
+	globalRanges, err := parseAllowlist(globalRaw)
 	if err != nil {
 		return nil, fmt.Errorf("invalid %s: %w", envWriteAllowlist, err)
 	}
 
 	holdingRanges := globalRanges
-	if raw := strings.TrimSpace(os.Getenv(envWriteAllowlistRegs)); raw != "" {
+	holdingRaw := os.Getenv(envWriteAllowlistRegs)
+	if overrides != nil && overrides.HoldingWriteAllowlist != nil {
+		holdingRaw = *overrides.HoldingWriteAllowlist
+	}
+	if raw := strings.TrimSpace(holdingRaw); raw != "" {
 		holdingRanges, err = parseAllowlist(raw)
 		if err != nil {
 			return nil, fmt.Errorf("invalid %s: %w", envWriteAllowlistRegs, err)
@@ -44,7 +68,11 @@ func LoadWritePolicyFromEnv() (*WritePolicy, error) {
 	}
 
 	coilRanges := globalRanges
-	if raw := strings.TrimSpace(os.Getenv(envWriteAllowlistCoils)); raw != "" {
+	coilRaw := os.Getenv(envWriteAllowlistCoils)
+	if overrides != nil && overrides.CoilWriteAllowlist != nil {
+		coilRaw = *overrides.CoilWriteAllowlist
+	}
+	if raw := strings.TrimSpace(coilRaw); raw != "" {
 		coilRanges, err = parseAllowlist(raw)
 		if err != nil {
 			return nil, fmt.Errorf("invalid %s: %w", envWriteAllowlistCoils, err)

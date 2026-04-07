@@ -1,0 +1,18 @@
+modbus_ip: 192.168.1.22
+modbus_port: 5002
+transport: streamable
+
+modbus_timeout: 10s
+modbus_idle_timeout: 2s
+
+modbus_retry_attempts: 3
+modbus_retry_backoff: 150ms
+modbus_retry_on_write: false
+modbus_circuit_trip_after: 3
+modbus_circuit_open_for: 2s
+
+write_policy:
+  writes_enabled: false
+  write_allowlist: "0-9"
+  holding_write_allowlist: "0-20"
+  coil_write_allowlist: "0-5"

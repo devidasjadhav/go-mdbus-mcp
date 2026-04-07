@@ -9,6 +9,7 @@ A lightweight, high-performance [Model Context Protocol (MCP)](https://modelcont
 - **Session-Safe Streamable HTTP**: Streamable transport runs in stateless JSON mode to avoid stale session issues (`session not found`) across reconnects.
 - **Resilient Connections**: Thread-safe Modbus dialer reconnects safely for each operation and recovers cleanly from idle timeout disconnects.
 - **Write Safety Guard**: Write tools are disabled by default and require explicit enablement via environment policy.
+- **Auto-Recovery Controls**: Configurable retry/backoff and circuit protection for transient network failures.
 - **Strongly Typed**: Input parsing schemas are automatically generated leveraging JSON Schema struct extraction.
 - **Container Ready**: Includes health checks (`/health` on port 8080) and a multi-stage Docker build process.
 
@@ -20,6 +21,7 @@ The server exposes the following MCP Tools to your LLM:
 2. `read-coils`: Read an array of `boolean` flags from a specified digital input/output address.
 3. `write-holding-registers`: Write an array of `uint16` values sequentially starting at a specified address.
 4. `write-coils`: Write an array of `boolean` flags sequentially starting at a specified address.
+5. `get-modbus-client-status`: Inspect retry counters, failures, and circuit state.
 
 ## Quick Start
 
@@ -33,6 +35,9 @@ go build -o modbus-server main.go
 # Connect to a default simulator (192.168.1.22:5002) using Streamable HTTP on port 8080
 ./modbus-server
 
+# Load settings from YAML/JSON config file
+./modbus-server --config ./server-config.yaml
+
 # Connect to a specific PLC IP and Port using STDIO (Best for Claude Desktop / Cursor)
 ./modbus-server --modbus-ip 10.0.0.50 --modbus-port 502 --transport stdio
 
@@ -41,6 +46,9 @@ go build -o modbus-server main.go
 
 # Enable writes explicitly (disabled by default)
 MODBUS_WRITES_ENABLED=true ./modbus-server
+
+# Tune retries and circuit behavior
+./modbus-server --modbus-retry-attempts 3 --modbus-retry-backoff 150ms --modbus-circuit-trip-after 3 --modbus-circuit-open-for 2s
 ```
 
 Write policy environment variables:
@@ -49,6 +57,29 @@ Write policy environment variables:
 - `MODBUS_WRITE_ALLOWLIST`: optional global address allowlist, e.g. `0-50,100,120-130`
 - `MODBUS_WRITE_ALLOWLIST_HOLDING`: optional allowlist override for holding-register writes
 - `MODBUS_WRITE_ALLOWLIST_COILS`: optional allowlist override for coil writes
+
+You can also set write policy and retry settings in config file (YAML/JSON). CLI flags override config file values.
+
+Example `server-config.yaml`:
+
+```yaml
+modbus_ip: 192.168.1.22
+modbus_port: 5002
+transport: streamable
+modbus_timeout: 10s
+modbus_idle_timeout: 2s
+modbus_retry_attempts: 3
+modbus_retry_backoff: 150ms
+modbus_retry_on_write: false
+modbus_circuit_trip_after: 3
+modbus_circuit_open_for: 2s
+
+write_policy:
+  writes_enabled: false
+  write_allowlist: "0-9"
+  holding_write_allowlist: "0-20"
+  coil_write_allowlist: "0-5"
+```
 
 ### Docker Usage
 

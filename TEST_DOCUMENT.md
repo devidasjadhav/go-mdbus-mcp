@@ -119,3 +119,60 @@ Scope validated:
 ## Conclusion
 
 Phase 1 write guarding behavior is validated and working as designed across normal, boundary, override, and invalid-configuration scenarios.
+
+## Phase 2: Connection Recovery + Config-Driven Runtime
+
+Date: 2026-04-07
+
+Scope validated:
+
+- Config file loading from `--config` (YAML/JSON parser path)
+- CLI flag precedence over config file values
+- Fail-fast behavior for invalid duration fields
+- Retry classifier behavior for transient errors
+- Write policy parser/guard behavior via unit tests
+
+### Test Log
+
+1) Build + startup smoke with config
+
+- Command:
+  - `go build -o modbus-server .`
+  - `timeout 3 ./modbus-server --config ./server-config.yaml --transport stdio`
+- Expected:
+  - server starts successfully
+  - write policy banner printed
+- Actual:
+  - startup succeeded
+  - banner printed: writes disabled by default
+- Result: PASS
+
+2) Invalid config duration fails fast
+
+- Command:
+  - `modbus_retry_backoff: nope` in temp config
+  - `./modbus-server --config /tmp/bad-config.yaml --transport stdio`
+- Expected:
+  - startup error with clear duration parse failure
+- Actual:
+  - `Invalid config value: invalid modbus_retry_backoff "nope": time: invalid duration "nope"`
+- Result: PASS
+
+3) Automated unit tests for policy/retry/config
+
+- Added tests:
+  - `modbus/write_policy_test.go`
+  - `modbus/client_retry_test.go`
+  - `config_test.go`
+- Command:
+  - `go test ./...`
+- Expected:
+  - all tests pass
+- Actual:
+  - `ok github.com/devidasjadhav/go-mdbus-mcp`
+  - `ok github.com/devidasjadhav/go-mdbus-mcp/modbus`
+- Result: PASS
+
+## Conclusion (Phase 1 + Phase 2)
+
+The server is validated for safety gating and config-driven runtime controls. Core policy and configuration paths are covered with both runtime checks and unit tests.

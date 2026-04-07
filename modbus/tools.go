@@ -2,6 +2,7 @@ package modbus
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 
@@ -37,7 +38,7 @@ func RegisterTools(s *mcp.Server, mc *ModbusClient, writePolicy *WritePolicy) {
 			Description: "Read Modbus holding registers",
 		},
 		func(ctx context.Context, req *mcp.CallToolRequest, args ReadArgs) (*mcp.CallToolResult, any, error) {
-			return executeTool(mc, args.SlaveID, func() (*mcp.CallToolResult, error) {
+			return executeTool(ctx, mc, args.SlaveID, true, func() (*mcp.CallToolResult, error) {
 				if args.Quantity == 0 {
 					return nil, fmt.Errorf("quantity must be greater than 0")
 				}
@@ -64,7 +65,7 @@ func RegisterTools(s *mcp.Server, mc *ModbusClient, writePolicy *WritePolicy) {
 			Description: "Read Modbus coils (digital inputs/outputs)",
 		},
 		func(ctx context.Context, req *mcp.CallToolRequest, args ReadArgs) (*mcp.CallToolResult, any, error) {
-			return executeTool(mc, args.SlaveID, func() (*mcp.CallToolResult, error) {
+			return executeTool(ctx, mc, args.SlaveID, true, func() (*mcp.CallToolResult, error) {
 				if args.Quantity == 0 {
 					return nil, fmt.Errorf("quantity must be greater than 0")
 				}
@@ -99,7 +100,7 @@ func RegisterTools(s *mcp.Server, mc *ModbusClient, writePolicy *WritePolicy) {
 				return errorResult(err.Error()), nil, nil
 			}
 
-			return executeTool(mc, args.SlaveID, func() (*mcp.CallToolResult, error) {
+			return executeTool(ctx, mc, args.SlaveID, false, func() (*mcp.CallToolResult, error) {
 				if len(args.Values) == 0 {
 					return nil, fmt.Errorf("values must contain at least one register value")
 				}
@@ -140,7 +141,7 @@ func RegisterTools(s *mcp.Server, mc *ModbusClient, writePolicy *WritePolicy) {
 				return errorResult(err.Error()), nil, nil
 			}
 
-			return executeTool(mc, args.SlaveID, func() (*mcp.CallToolResult, error) {
+			return executeTool(ctx, mc, args.SlaveID, false, func() (*mcp.CallToolResult, error) {
 				if len(args.Values) == 0 {
 					return nil, fmt.Errorf("values must contain at least one coil value")
 				}
@@ -163,17 +164,31 @@ func RegisterTools(s *mcp.Server, mc *ModbusClient, writePolicy *WritePolicy) {
 			})
 		},
 	)
+
+	mcp.AddTool(s,
+		&mcp.Tool{
+			Name:        "get-modbus-client-status",
+			Description: "Get Modbus client retry and connection lifecycle status",
+		},
+		func(ctx context.Context, req *mcp.CallToolRequest, args struct{}) (*mcp.CallToolResult, any, error) {
+			raw, err := json.MarshalIndent(mc.Status(), "", "  ")
+			if err != nil {
+				return errorResult(fmt.Sprintf("failed to format client status: %v", err)), nil, nil
+			}
+			return successResult(string(raw)), nil, nil
+		},
+	)
 }
 
 // executeTool is a helper to run thread-safe operations on the Modbus client
 // and handle any protocol errors.
-func executeTool(mc *ModbusClient, slaveID *uint8, operation func() (*mcp.CallToolResult, error)) (*mcp.CallToolResult, any, error) {
+func executeTool(ctx context.Context, mc *ModbusClient, slaveID *uint8, allowRetry bool, operation func() (*mcp.CallToolResult, error)) (*mcp.CallToolResult, any, error) {
 	targetSlaveID := uint8(1)
 	if slaveID != nil {
 		targetSlaveID = *slaveID
 	}
 
-	res, err := mc.Execute(targetSlaveID, operation)
+	res, err := mc.Execute(ctx, targetSlaveID, allowRetry, operation)
 	if err != nil {
 		// As per the official SDK docs, we return formatting errors directly inside CallToolResult
 		// rather than returning a protocol error to avoid hanging the MCP stream.

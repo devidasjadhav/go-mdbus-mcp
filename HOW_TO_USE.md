@@ -20,6 +20,12 @@ Run server:
 ./modbus-server --transport streamable --modbus-ip 192.168.1.22 --modbus-port 5002
 ```
 
+Or load from config file:
+
+```bash
+./modbus-server --config ./server-config.yaml
+```
+
 If you need write tools during validation, enable them explicitly:
 
 ```bash
@@ -81,6 +87,12 @@ Run these negative tests and verify errors are returned:
 Expected result:
 - Operation still succeeds.
 - Server logs show clean close/reconnect between calls.
+
+### 6) Client recovery status
+
+Use this tool to inspect retry/circuit counters when diagnosing network instability:
+
+- `get-modbus-client-status()`
 
 ## What Was Verified In This Project
 
