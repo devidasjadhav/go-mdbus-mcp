@@ -30,7 +30,7 @@ type WriteCoilsArgs struct {
 }
 
 // RegisterTools registers all available modbus tools to the MCP server.
-func RegisterTools(s *mcp.Server, mc *ModbusClient) {
+func RegisterTools(s *mcp.Server, mc *ModbusClient, writePolicy *WritePolicy) {
 	mcp.AddTool(s,
 		&mcp.Tool{
 			Name:        "read-holding-registers",
@@ -95,6 +95,10 @@ func RegisterTools(s *mcp.Server, mc *ModbusClient) {
 			Description: "Write values to Modbus holding registers",
 		},
 		func(ctx context.Context, req *mcp.CallToolRequest, args WriteHoldingRegistersArgs) (*mcp.CallToolResult, any, error) {
+			if err := writePolicy.ValidateHoldingWrite(args.Address, len(args.Values)); err != nil {
+				return errorResult(err.Error()), nil, nil
+			}
+
 			return executeTool(mc, args.SlaveID, func() (*mcp.CallToolResult, error) {
 				if len(args.Values) == 0 {
 					return nil, fmt.Errorf("values must contain at least one register value")
@@ -132,6 +136,10 @@ func RegisterTools(s *mcp.Server, mc *ModbusClient) {
 			Description: "Write values to Modbus coils (digital outputs)",
 		},
 		func(ctx context.Context, req *mcp.CallToolRequest, args WriteCoilsArgs) (*mcp.CallToolResult, any, error) {
+			if err := writePolicy.ValidateCoilWrite(args.Address, len(args.Values)); err != nil {
+				return errorResult(err.Error()), nil, nil
+			}
+
 			return executeTool(mc, args.SlaveID, func() (*mcp.CallToolResult, error) {
 				if len(args.Values) == 0 {
 					return nil, fmt.Errorf("values must contain at least one coil value")

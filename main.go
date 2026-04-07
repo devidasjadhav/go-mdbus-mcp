@@ -60,8 +60,18 @@ func main() {
 		Version: version,
 	}, nil)
 
+	writePolicy, err := modbus.LoadWritePolicyFromEnv()
+	if err != nil {
+		log.Fatalf("Invalid write policy configuration: %v", err)
+	}
+	if writePolicy.Enabled() {
+		fmt.Fprintln(os.Stderr, "✍️  Modbus writes are ENABLED by policy")
+	} else {
+		fmt.Fprintln(os.Stderr, "🔒 Modbus writes are DISABLED by default (set MODBUS_WRITES_ENABLED=true to allow writes)")
+	}
+
 	// Register tools natively with the SDK
-	modbus.RegisterTools(s, modbusClient)
+	modbus.RegisterTools(s, modbusClient, writePolicy)
 
 	// Start transport with graceful shutdown on SIGINT/SIGTERM.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

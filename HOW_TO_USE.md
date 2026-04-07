@@ -20,6 +20,12 @@ Run server:
 ./modbus-server --transport streamable --modbus-ip 192.168.1.22 --modbus-port 5002
 ```
 
+If you need write tools during validation, enable them explicitly:
+
+```bash
+MODBUS_WRITES_ENABLED=true ./modbus-server --transport streamable --modbus-ip 192.168.1.22 --modbus-port 5002
+```
+
 ## OpenCode Validation Flow
 
 Use these MCP tool calls from OpenCode.

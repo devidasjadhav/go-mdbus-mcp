@@ -8,6 +8,7 @@ A lightweight, high-performance [Model Context Protocol (MCP)](https://modelcont
 - **Multiple Transports**: Fully supports `stdio`, Server-Sent Events (`sse`), and the new Streamable HTTP (`streamable`) MCP protocols.
 - **Session-Safe Streamable HTTP**: Streamable transport runs in stateless JSON mode to avoid stale session issues (`session not found`) across reconnects.
 - **Resilient Connections**: Thread-safe Modbus dialer reconnects safely for each operation and recovers cleanly from idle timeout disconnects.
+- **Write Safety Guard**: Write tools are disabled by default and require explicit enablement via environment policy.
 - **Strongly Typed**: Input parsing schemas are automatically generated leveraging JSON Schema struct extraction.
 - **Container Ready**: Includes health checks (`/health` on port 8080) and a multi-stage Docker build process.
 
@@ -37,7 +38,17 @@ go build -o modbus-server main.go
 
 # Run using standard Server-Sent Events (SSE)
 ./modbus-server --transport sse
+
+# Enable writes explicitly (disabled by default)
+MODBUS_WRITES_ENABLED=true ./modbus-server
 ```
+
+Write policy environment variables:
+
+- `MODBUS_WRITES_ENABLED`: `true|false` (default `false`)
+- `MODBUS_WRITE_ALLOWLIST`: optional global address allowlist, e.g. `0-50,100,120-130`
+- `MODBUS_WRITE_ALLOWLIST_HOLDING`: optional allowlist override for holding-register writes
+- `MODBUS_WRITE_ALLOWLIST_COILS`: optional allowlist override for coil writes
 
 ### Docker Usage
 
@@ -71,6 +82,8 @@ To use this server natively in Claude Desktop, add the following to your `claude
 ## Contributing & Testing
 
 Detailed usage and OpenCode validation steps are documented in `HOW_TO_USE.md`.
+
+Validated test runs and outcomes are documented in `TEST_DOCUMENT.md`.
 
 Standard Go toolchains are used. The heavy lifting is done via the `modbus` folder.
 
