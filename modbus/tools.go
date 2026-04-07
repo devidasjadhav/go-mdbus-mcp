@@ -30,8 +30,20 @@ type WriteCoilsArgs struct {
 	SlaveID *uint8 `json:"slave_id,omitempty" jsonschema:"Optional Modbus Slave ID (defaults to 1)"`
 }
 
+type ReadTagArgs struct {
+	Name    string `json:"name" jsonschema:"Configured tag name to read"`
+	SlaveID *uint8 `json:"slave_id,omitempty" jsonschema:"Optional Modbus Slave ID override"`
+}
+
+type WriteTagArgs struct {
+	Name          string   `json:"name" jsonschema:"Configured tag name to write"`
+	HoldingValues []uint16 `json:"holding_values,omitempty" jsonschema:"Values for holding-register tags"`
+	CoilValues    []bool   `json:"coil_values,omitempty" jsonschema:"Values for coil tags"`
+	SlaveID       *uint8   `json:"slave_id,omitempty" jsonschema:"Optional Modbus Slave ID override"`
+}
+
 // RegisterTools registers all available modbus tools to the MCP server.
-func RegisterTools(s *mcp.Server, mc *ModbusClient, writePolicy *WritePolicy) {
+func RegisterTools(s *mcp.Server, mc *ModbusClient, writePolicy *WritePolicy, tagMap *TagMap) {
 	mcp.AddTool(s,
 		&mcp.Tool{
 			Name:        "read-holding-registers",
@@ -178,6 +190,151 @@ func RegisterTools(s *mcp.Server, mc *ModbusClient, writePolicy *WritePolicy) {
 			return successResult(string(raw)), nil, nil
 		},
 	)
+
+	mcp.AddTool(s,
+		&mcp.Tool{
+			Name:        "list-tags",
+			Description: "List configured semantic Modbus tags",
+		},
+		func(ctx context.Context, req *mcp.CallToolRequest, args struct{}) (*mcp.CallToolResult, any, error) {
+			tags := tagMap.List()
+			if len(tags) == 0 {
+				return successResult("No tags configured. Add tags in server config file under 'tags'."), nil, nil
+			}
+			raw, err := json.MarshalIndent(tags, "", "  ")
+			if err != nil {
+				return errorResult(fmt.Sprintf("failed to format tag list: %v", err)), nil, nil
+			}
+			return successResult(string(raw)), nil, nil
+		},
+	)
+
+	mcp.AddTool(s,
+		&mcp.Tool{
+			Name:        "read-tag",
+			Description: "Read a configured semantic Modbus tag",
+		},
+		func(ctx context.Context, req *mcp.CallToolRequest, args ReadTagArgs) (*mcp.CallToolResult, any, error) {
+			tag, ok := tagMap.Get(args.Name)
+			if !ok {
+				return errorResult(fmt.Sprintf("tag %q not found", args.Name)), nil, nil
+			}
+			if !tag.Readable() {
+				return errorResult(fmt.Sprintf("tag %q is not readable", tag.Name)), nil, nil
+			}
+
+			targetSlave := resolveSlaveID(args.SlaveID, tag.SlaveID)
+			return executeTool(ctx, mc, targetSlave, true, func() (*mcp.CallToolResult, error) {
+				switch tag.Kind {
+				case TagKindHolding:
+					results, err := mc.Client().ReadHoldingRegisters(tag.Address, tag.Quantity)
+					if err != nil {
+						return nil, fmt.Errorf("error reading tag %q: %w", tag.Name, err)
+					}
+					values := make([]uint16, len(results)/2)
+					for i := 0; i < len(results); i += 2 {
+						values[i/2] = uint16(results[i])<<8 | uint16(results[i+1])
+					}
+					return successResult(fmt.Sprintf("Tag %s (%s) => %v", tag.Name, tag.Kind, values)), nil
+
+				case TagKindCoil:
+					results, err := mc.Client().ReadCoils(tag.Address, tag.Quantity)
+					if err != nil {
+						return nil, fmt.Errorf("error reading tag %q: %w", tag.Name, err)
+					}
+					values := make([]bool, tag.Quantity)
+					for i := uint16(0); i < tag.Quantity; i++ {
+						byteIndex := i / 8
+						bitIndex := i % 8
+						if byteIndex < uint16(len(results)) {
+							values[i] = (results[byteIndex] & (1 << bitIndex)) != 0
+						}
+					}
+					return successResult(fmt.Sprintf("Tag %s (%s) => %v", tag.Name, tag.Kind, values)), nil
+				}
+				return nil, fmt.Errorf("tag %q has unsupported kind %q", tag.Name, tag.Kind)
+			})
+		},
+	)
+
+	mcp.AddTool(s,
+		&mcp.Tool{
+			Name:        "write-tag",
+			Description: "Write a configured semantic Modbus tag",
+		},
+		func(ctx context.Context, req *mcp.CallToolRequest, args WriteTagArgs) (*mcp.CallToolResult, any, error) {
+			tag, ok := tagMap.Get(args.Name)
+			if !ok {
+				return errorResult(fmt.Sprintf("tag %q not found", args.Name)), nil, nil
+			}
+			if !tag.Writable() {
+				return errorResult(fmt.Sprintf("tag %q is not writable", tag.Name)), nil, nil
+			}
+
+			targetSlave := resolveSlaveID(args.SlaveID, tag.SlaveID)
+			switch tag.Kind {
+			case TagKindHolding:
+				if len(args.HoldingValues) == 0 {
+					return errorResult("holding_values must contain at least one value for holding_register tag"), nil, nil
+				}
+				if len(args.HoldingValues) != int(tag.Quantity) {
+					return errorResult(fmt.Sprintf("holding_values length must match tag quantity %d", tag.Quantity)), nil, nil
+				}
+				if err := writePolicy.ValidateHoldingWrite(tag.Address, len(args.HoldingValues)); err != nil {
+					return errorResult(err.Error()), nil, nil
+				}
+
+				return executeTool(ctx, mc, targetSlave, false, func() (*mcp.CallToolResult, error) {
+					if len(args.HoldingValues) == 1 {
+						_, err := mc.Client().WriteSingleRegister(tag.Address, args.HoldingValues[0])
+						if err != nil {
+							return nil, fmt.Errorf("error writing tag %q: %w", tag.Name, err)
+						}
+						return successResult(fmt.Sprintf("Tag %s written to %d", tag.Name, args.HoldingValues[0])), nil
+					}
+
+					data := make([]byte, len(args.HoldingValues)*2)
+					for i, val := range args.HoldingValues {
+						data[i*2] = byte(val >> 8)
+						data[i*2+1] = byte(val & 0xFF)
+					}
+					_, err := mc.Client().WriteMultipleRegisters(tag.Address, uint16(len(args.HoldingValues)), data)
+					if err != nil {
+						return nil, fmt.Errorf("error writing tag %q: %w", tag.Name, err)
+					}
+					return successResult(fmt.Sprintf("Tag %s written: %v", tag.Name, args.HoldingValues)), nil
+				})
+
+			case TagKindCoil:
+				if len(args.CoilValues) == 0 {
+					return errorResult("coil_values must contain at least one value for coil tag"), nil, nil
+				}
+				if len(args.CoilValues) != int(tag.Quantity) {
+					return errorResult(fmt.Sprintf("coil_values length must match tag quantity %d", tag.Quantity)), nil, nil
+				}
+				if err := writePolicy.ValidateCoilWrite(tag.Address, len(args.CoilValues)); err != nil {
+					return errorResult(err.Error()), nil, nil
+				}
+
+				return executeTool(ctx, mc, targetSlave, false, func() (*mcp.CallToolResult, error) {
+					byteCount := (len(args.CoilValues) + 7) / 8
+					coilBytes := make([]byte, byteCount)
+					for i, val := range args.CoilValues {
+						if val {
+							coilBytes[i/8] |= (1 << uint(i%8))
+						}
+					}
+					_, err := mc.Client().WriteMultipleCoils(tag.Address, uint16(len(args.CoilValues)), coilBytes)
+					if err != nil {
+						return nil, fmt.Errorf("error writing tag %q: %w", tag.Name, err)
+					}
+					return successResult(fmt.Sprintf("Tag %s written: %v", tag.Name, args.CoilValues)), nil
+				})
+			}
+
+			return errorResult(fmt.Sprintf("tag %q has unsupported kind %q", tag.Name, tag.Kind)), nil, nil
+		},
+	)
 }
 
 // executeTool is a helper to run thread-safe operations on the Modbus client
@@ -216,4 +373,15 @@ func successResult(text string) *mcp.CallToolResult {
 			},
 		},
 	}
+}
+
+func resolveSlaveID(requestSlaveID *uint8, tagSlaveID *uint8) *uint8 {
+	if requestSlaveID != nil {
+		return requestSlaveID
+	}
+	if tagSlaveID == nil {
+		return nil
+	}
+	v := *tagSlaveID
+	return &v
 }

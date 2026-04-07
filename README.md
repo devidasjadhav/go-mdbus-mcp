@@ -22,6 +22,9 @@ The server exposes the following MCP Tools to your LLM:
 3. `write-holding-registers`: Write an array of `uint16` values sequentially starting at a specified address.
 4. `write-coils`: Write an array of `boolean` flags sequentially starting at a specified address.
 5. `get-modbus-client-status`: Inspect retry counters, failures, and circuit state.
+6. `list-tags`: List configured semantic tag definitions.
+7. `read-tag`: Read by semantic tag name.
+8. `write-tag`: Write by semantic tag name (subject to write policy).
 
 ## Quick Start
 
@@ -79,6 +82,18 @@ write_policy:
   write_allowlist: "0-9"
   holding_write_allowlist: "0-20"
   coil_write_allowlist: "0-5"
+
+tags:
+  - name: ambient_temp_raw
+    kind: holding_register
+    address: 0
+    quantity: 1
+    access: read
+  - name: run_command
+    kind: coil
+    address: 0
+    quantity: 1
+    access: read_write
 ```
 
 ### Docker Usage

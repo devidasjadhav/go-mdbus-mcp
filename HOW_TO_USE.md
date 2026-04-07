@@ -94,6 +94,19 @@ Use this tool to inspect retry/circuit counters when diagnosing network instabil
 
 - `get-modbus-client-status()`
 
+### 7) Tag-based operations
+
+With `tags` configured in `server-config.yaml`, use semantic tag tools:
+
+- `list-tags()`
+- `read-tag(name="ambient_temp_raw")`
+- `write-tag(name="run_command", coil_values=[true])`
+
+Notes:
+
+- `write-tag` is still guarded by write policy.
+- `write-tag` value array length must match configured tag `quantity`.
+
 ## What Was Verified In This Project
 
 The OpenCode test session verified:

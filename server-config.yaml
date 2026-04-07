@@ -16,3 +16,15 @@ write_policy:
   write_allowlist: "0-9"
   holding_write_allowlist: "0-20"
   coil_write_allowlist: "0-5"
+
+tags:
+  - name: ambient_temp_raw
+    kind: holding_register
+    address: 0
+    quantity: 1
+    access: read
+  - name: run_command
+    kind: coil
+    address: 0
+    quantity: 1
+    access: read_write

@@ -93,6 +93,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("Invalid write policy configuration: %v", err)
 	}
+
+	tagMap, err := toTagMap(fileCfg)
+	if err != nil {
+		log.Fatalf("Invalid tag configuration: %v", err)
+	}
+	if tagMap != nil {
+		fmt.Fprintf(os.Stderr, "🏷️  Loaded %d configured tags\n", len(tagMap.List()))
+	}
 	if writePolicy.Enabled() {
 		fmt.Fprintln(os.Stderr, "✍️  Modbus writes are ENABLED by policy")
 	} else {
@@ -100,7 +108,7 @@ func main() {
 	}
 
 	// Register tools natively with the SDK
-	modbus.RegisterTools(s, modbusClient, writePolicy)
+	modbus.RegisterTools(s, modbusClient, writePolicy, tagMap)
 
 	// Start transport with graceful shutdown on SIGINT/SIGTERM.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

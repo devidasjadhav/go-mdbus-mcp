@@ -90,6 +90,25 @@ func TestApplyConfigOverrides_InvalidDuration(t *testing.T) {
 	}
 }
 
+func TestToTagMap(t *testing.T) {
+	cfg := &AppConfig{
+		Tags: []TagConfig{
+			{Name: "ambient_temp", Kind: "holding_register", Address: 10, Quantity: 1, Access: "read"},
+		},
+	}
+
+	tagMap, err := toTagMap(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if tagMap == nil {
+		t.Fatalf("expected tag map")
+	}
+	if _, ok := tagMap.Get("ambient_temp"); !ok {
+		t.Fatalf("expected configured tag to exist")
+	}
+}
+
 func ptr[T any](v T) *T {
 	return &v
 }

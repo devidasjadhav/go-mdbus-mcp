@@ -25,6 +25,7 @@ type AppConfig struct {
 	Transport           *string `json:"transport" yaml:"transport"`
 
 	WritePolicy *WritePolicyConfig `json:"write_policy" yaml:"write_policy"`
+	Tags        []TagConfig        `json:"tags" yaml:"tags"`
 }
 
 type WritePolicyConfig struct {
@@ -32,6 +33,15 @@ type WritePolicyConfig struct {
 	WriteAllowlist        *string `json:"write_allowlist" yaml:"write_allowlist"`
 	HoldingWriteAllowlist *string `json:"holding_write_allowlist" yaml:"holding_write_allowlist"`
 	CoilWriteAllowlist    *string `json:"coil_write_allowlist" yaml:"coil_write_allowlist"`
+}
+
+type TagConfig struct {
+	Name     string `json:"name" yaml:"name"`
+	Kind     string `json:"kind" yaml:"kind"`
+	Address  uint16 `json:"address" yaml:"address"`
+	Quantity uint16 `json:"quantity" yaml:"quantity"`
+	SlaveID  *uint8 `json:"slave_id,omitempty" yaml:"slave_id,omitempty"`
+	Access   string `json:"access" yaml:"access"`
 }
 
 func loadAppConfig(path string) (*AppConfig, error) {
@@ -141,4 +151,24 @@ func toWritePolicyOverrides(cfg *AppConfig) *modbus.WritePolicyOverrides {
 		HoldingWriteAllowlist: cfg.WritePolicy.HoldingWriteAllowlist,
 		CoilWriteAllowlist:    cfg.WritePolicy.CoilWriteAllowlist,
 	}
+}
+
+func toTagMap(cfg *AppConfig) (*modbus.TagMap, error) {
+	if cfg == nil || len(cfg.Tags) == 0 {
+		return nil, nil
+	}
+
+	tags := make([]modbus.TagDef, 0, len(cfg.Tags))
+	for _, t := range cfg.Tags {
+		tags = append(tags, modbus.TagDef{
+			Name:     t.Name,
+			Kind:     modbus.TagKind(t.Kind),
+			Address:  t.Address,
+			Quantity: t.Quantity,
+			SlaveID:  t.SlaveID,
+			Access:   modbus.TagAccess(t.Access),
+		})
+	}
+
+	return modbus.NewTagMap(tags)
 }
