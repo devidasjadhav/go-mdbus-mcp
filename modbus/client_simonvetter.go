@@ -74,12 +74,13 @@ func (d *simonvetterDriver) Execute(ctx context.Context, slaveID uint8, allowRet
 
 	var lastErr error
 	rtuMode := strings.EqualFold(strings.TrimSpace(d.config.Mode), "rtu")
+	reconnectPerOp := d.config.ReconnectPerOp || rtuMode
 	for attempt := 1; attempt <= attempts; attempt++ {
 		if err := ctx.Err(); err != nil {
 			return nil, fmt.Errorf("operation canceled: %w", err)
 		}
 
-		if !rtuMode {
+		if !rtuMode && reconnectPerOp {
 			if d.client != nil {
 				_ = d.client.Close()
 				d.client = nil
@@ -104,7 +105,7 @@ func (d *simonvetterDriver) Execute(ctx context.Context, slaveID uint8, allowRet
 				lastErr = normalizeDriverError(err)
 			} else {
 				res, opErr := operation()
-				if !rtuMode {
+				if !rtuMode && reconnectPerOp {
 					_ = d.client.Close()
 					d.client = nil
 				}
@@ -124,6 +125,11 @@ func (d *simonvetterDriver) Execute(ctx context.Context, slaveID uint8, allowRet
 		if attempt == attempts || !shouldRetryError(lastErr) {
 			d.recordFailure(lastErr)
 			return nil, lastErr
+		}
+
+		if !rtuMode && d.client != nil {
+			_ = d.client.Close()
+			d.client = nil
 		}
 
 		d.stats.TotalRetries++

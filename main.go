@@ -42,6 +42,7 @@ func main() {
 	modbusRetryAttempts := flag.Int("modbus-retry-attempts", 3, "Modbus retry attempts for transient errors")
 	modbusRetryBackoff := flag.Duration("modbus-retry-backoff", 150*time.Millisecond, "Initial retry backoff for transient errors")
 	modbusRetryOnWrite := flag.Bool("modbus-retry-on-write", false, "Allow retries on write operations")
+	modbusReconnectPerOp := flag.Bool("modbus-reconnect-per-operation", true, "Reconnect Modbus TCP client before each operation")
 	modbusCircuitTripAfter := flag.Int("modbus-circuit-trip-after", 3, "Consecutive failures before opening circuit")
 	modbusCircuitOpenFor := flag.Duration("modbus-circuit-open-for", 2*time.Second, "Duration to keep circuit open after trip")
 	mockMode := flag.Bool("mock-mode", false, "Run without real Modbus device using in-memory mock client")
@@ -52,26 +53,27 @@ func main() {
 	flag.Parse()
 
 	runtimeOpts := appconfig.RuntimeOptions{
-		ModbusDriver:        *modbusDriver,
-		ModbusMode:          *modbusMode,
-		SerialPort:          *serialPort,
-		BaudRate:            *baudRate,
-		DataBits:            *dataBits,
-		Parity:              *parity,
-		StopBits:            *stopBits,
-		ModbusIP:            *modbusIP,
-		ModbusPort:          *modbusPort,
-		ModbusTimeout:       *modbusTimeout,
-		ModbusIdleTimeout:   *modbusIdleTimeout,
-		ModbusRetryAttempts: *modbusRetryAttempts,
-		ModbusRetryBackoff:  *modbusRetryBackoff,
-		ModbusRetryOnWrite:  *modbusRetryOnWrite,
-		CircuitTripAfter:    *modbusCircuitTripAfter,
-		CircuitOpenFor:      *modbusCircuitOpenFor,
-		MockMode:            *mockMode,
-		MockRegisters:       *mockRegisters,
-		MockCoils:           *mockCoils,
-		Transport:           *transportFlag,
+		ModbusDriver:         *modbusDriver,
+		ModbusMode:           *modbusMode,
+		SerialPort:           *serialPort,
+		BaudRate:             *baudRate,
+		DataBits:             *dataBits,
+		Parity:               *parity,
+		StopBits:             *stopBits,
+		ModbusIP:             *modbusIP,
+		ModbusPort:           *modbusPort,
+		ModbusTimeout:        *modbusTimeout,
+		ModbusIdleTimeout:    *modbusIdleTimeout,
+		ModbusRetryAttempts:  *modbusRetryAttempts,
+		ModbusRetryBackoff:   *modbusRetryBackoff,
+		ModbusRetryOnWrite:   *modbusRetryOnWrite,
+		ModbusReconnectPerOp: *modbusReconnectPerOp,
+		CircuitTripAfter:     *modbusCircuitTripAfter,
+		CircuitOpenFor:       *modbusCircuitOpenFor,
+		MockMode:             *mockMode,
+		MockRegisters:        *mockRegisters,
+		MockCoils:            *mockCoils,
+		Transport:            *transportFlag,
 	}
 
 	setFlags := map[string]bool{}
@@ -117,26 +119,28 @@ func main() {
 
 	// Create Modbus driver
 	driver, err := modbus.NewDriver(&modbus.Config{
-		Driver:           runtimeOpts.ModbusDriver,
-		Mode:             runtimeOpts.ModbusMode,
-		SerialPort:       runtimeOpts.SerialPort,
-		BaudRate:         runtimeOpts.BaudRate,
-		DataBits:         runtimeOpts.DataBits,
-		Parity:           runtimeOpts.Parity,
-		StopBits:         runtimeOpts.StopBits,
-		ModbusIP:         runtimeOpts.ModbusIP,
-		ModbusPort:       runtimeOpts.ModbusPort,
-		Timeout:          runtimeOpts.ModbusTimeout,
-		IdleTimeout:      runtimeOpts.ModbusIdleTimeout,
-		DefaultSlaveID:   1,
-		RetryAttempts:    runtimeOpts.ModbusRetryAttempts,
-		RetryBackoff:     runtimeOpts.ModbusRetryBackoff,
-		RetryOnWrite:     runtimeOpts.ModbusRetryOnWrite,
-		CircuitTripAfter: runtimeOpts.CircuitTripAfter,
-		CircuitOpenFor:   runtimeOpts.CircuitOpenFor,
-		UseMock:          runtimeOpts.MockMode,
-		MockRegisters:    runtimeOpts.MockRegisters,
-		MockCoils:        runtimeOpts.MockCoils,
+		Driver:                   runtimeOpts.ModbusDriver,
+		Mode:                     runtimeOpts.ModbusMode,
+		SerialPort:               runtimeOpts.SerialPort,
+		BaudRate:                 runtimeOpts.BaudRate,
+		DataBits:                 runtimeOpts.DataBits,
+		Parity:                   runtimeOpts.Parity,
+		StopBits:                 runtimeOpts.StopBits,
+		ModbusIP:                 runtimeOpts.ModbusIP,
+		ModbusPort:               runtimeOpts.ModbusPort,
+		Timeout:                  runtimeOpts.ModbusTimeout,
+		IdleTimeout:              runtimeOpts.ModbusIdleTimeout,
+		DefaultSlaveID:           1,
+		RetryAttempts:            runtimeOpts.ModbusRetryAttempts,
+		RetryBackoff:             runtimeOpts.ModbusRetryBackoff,
+		RetryOnWrite:             runtimeOpts.ModbusRetryOnWrite,
+		ReconnectPerOp:           runtimeOpts.ModbusReconnectPerOp,
+		ReconnectPerOpConfigured: true,
+		CircuitTripAfter:         runtimeOpts.CircuitTripAfter,
+		CircuitOpenFor:           runtimeOpts.CircuitOpenFor,
+		UseMock:                  runtimeOpts.MockMode,
+		MockRegisters:            runtimeOpts.MockRegisters,
+		MockCoils:                runtimeOpts.MockCoils,
 	})
 	if err != nil {
 		log.Fatalf("failed to create modbus driver: %v", err)

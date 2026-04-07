@@ -35,3 +35,19 @@ func TestShouldRetryError(t *testing.T) {
 		})
 	}
 }
+
+func TestApplyCommonDefaultsReconnectPerOpDefaultEnabled(t *testing.T) {
+	cfg := &Config{}
+	applyCommonDefaults(cfg)
+	if !cfg.ReconnectPerOp {
+		t.Fatalf("expected reconnect-per-op default to be enabled")
+	}
+}
+
+func TestApplyCommonDefaultsReconnectPerOpRespectsExplicitFalse(t *testing.T) {
+	cfg := &Config{ReconnectPerOp: false, ReconnectPerOpConfigured: true}
+	applyCommonDefaults(cfg)
+	if cfg.ReconnectPerOp {
+		t.Fatalf("expected reconnect-per-op to remain disabled when explicitly configured")
+	}
+}

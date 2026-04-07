@@ -9,6 +9,7 @@ modbus_idle_timeout: 2s
 modbus_retry_attempts: 3
 modbus_retry_backoff: 150ms
 modbus_retry_on_write: false
+modbus_reconnect_per_operation: true
 modbus_circuit_trip_after: 3
 modbus_circuit_open_for: 2s
 mock_mode: false

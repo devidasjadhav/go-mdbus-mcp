@@ -270,7 +270,7 @@ Verification:
 - targeted stress/parallel tool-call test
 - benchmarks before/after
 
-Status note (2026-04-07): HTTP timeout hardening is implemented. Driver lock-granularity and reconnect-strategy refactor is intentionally deferred to a dedicated follow-up pass to avoid mixing behavior-changing concurrency work with safety/config updates.
+Status note (2026-04-07): HTTP timeout hardening is implemented. Reconnect strategy is now configurable via `modbus_reconnect_per_operation`/`--modbus-reconnect-per-operation` (default `true`) with retry-triggered reconnect when disabled. Lock-granularity/concurrency redesign remains deferred to a dedicated pass.
 
 ### Pass 6: Documentation and Repo Hygiene
 
