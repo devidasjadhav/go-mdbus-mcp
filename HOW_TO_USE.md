@@ -32,6 +32,12 @@ Or load semantic tags from CSV directly:
 ./modbus-server --tag-map-csv ./tag-map.csv
 ```
 
+For hardware-free testing:
+
+```bash
+./modbus-server --mock-mode --config ./server-config.yaml
+```
+
 If you need write tools during validation, enable them explicitly:
 
 ```bash

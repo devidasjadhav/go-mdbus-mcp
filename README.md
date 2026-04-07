@@ -44,6 +44,9 @@ go build -o modbus-server main.go
 # Or pass tag mapping CSV directly
 ./modbus-server --tag-map-csv ./tag-map.csv
 
+# Run fully in-memory (no PLC required)
+./modbus-server --mock-mode --config ./server-config.yaml
+
 # Connect to a specific PLC IP and Port using STDIO (Best for Claude Desktop / Cursor)
 ./modbus-server --modbus-ip 10.0.0.50 --modbus-port 502 --transport stdio
 
@@ -82,6 +85,9 @@ modbus_retry_backoff: 150ms
 modbus_retry_on_write: false
 modbus_circuit_trip_after: 3
 modbus_circuit_open_for: 2s
+mock_mode: false
+mock_registers: 1024
+mock_coils: 1024
 
 write_policy:
   writes_enabled: false

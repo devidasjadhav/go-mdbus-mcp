@@ -56,10 +56,29 @@ type Config struct {
 	RetryOnWrite     bool
 	CircuitTripAfter int
 	CircuitOpenFor   time.Duration
+	UseMock          bool
+	MockRegisters    int
+	MockCoils        int
 }
 
 // NewModbusClient creates a new Modbus client
 func NewModbusClient(config *Config) *ModbusClient {
+	if config.UseMock {
+		registerCount := config.MockRegisters
+		if registerCount <= 0 {
+			registerCount = 1024
+		}
+		coilCount := config.MockCoils
+		if coilCount <= 0 {
+			coilCount = 1024
+		}
+
+		return &ModbusClient{
+			client: newMockClient(registerCount, coilCount),
+			config: config,
+		}
+	}
+
 	if config.Timeout <= 0 {
 		config.Timeout = 10 * time.Second
 	}
@@ -104,6 +123,9 @@ func newTCPHandler(config *Config, slaveID uint8) *modbus.TCPClientHandler {
 func (mc *ModbusClient) Close() error {
 	mc.mu.Lock()
 	defer mc.mu.Unlock()
+	if mc.config != nil && mc.config.UseMock {
+		return nil
+	}
 	if mc.handler != nil {
 		return mc.handler.Close()
 	}
@@ -124,6 +146,19 @@ func (mc *ModbusClient) Client() modbus.Client {
 func (mc *ModbusClient) Execute(ctx context.Context, slaveID uint8, allowRetry bool, operation func() (*mcp.CallToolResult, error)) (*mcp.CallToolResult, error) {
 	mc.mu.Lock()
 	defer mc.mu.Unlock()
+
+	if mc.config != nil && mc.config.UseMock {
+		if err := ctx.Err(); err != nil {
+			return nil, fmt.Errorf("operation canceled: %w", err)
+		}
+		res, err := operation()
+		if err != nil {
+			mc.recordFailure(err)
+			return nil, err
+		}
+		mc.recordSuccess()
+		return res, nil
+	}
 
 	now := time.Now()
 	if !mc.stats.CircuitOpenUntil.IsZero() && now.Before(mc.stats.CircuitOpenUntil) {

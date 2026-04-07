@@ -11,6 +11,9 @@ modbus_retry_backoff: 150ms
 modbus_retry_on_write: false
 modbus_circuit_trip_after: 3
 modbus_circuit_open_for: 2s
+mock_mode: false
+mock_registers: 1024
+mock_coils: 1024
 
 write_policy:
   writes_enabled: false

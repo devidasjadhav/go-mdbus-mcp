@@ -261,3 +261,30 @@ Scope validated:
 ## Conclusion (Phase 1-4)
 
 The server now supports guarded writes, recovery controls, CSV-based semantic tags, typed tag reads, and typed tag writes with automated test coverage.
+
+## Phase 5: Mock Mode (Hardware-Free Validation)
+
+Date: 2026-04-07
+
+Scope validated:
+
+- In-memory Modbus client enabled via `--mock-mode`
+- Mock register and coil read/write behavior
+- Config support for `mock_mode`, `mock_registers`, `mock_coils`
+
+### Test Log
+
+1) Unit tests for in-memory Modbus behavior
+
+- Added tests:
+  - `modbus/mock_client_test.go`
+- Covered:
+  - holding register write/read
+  - coil write/read (packed bit format)
+- Command:
+  - `go test ./...`
+- Result: PASS
+
+## Conclusion (Phase 1-5)
+
+The server now includes a deterministic in-memory mock path for development and CI, reducing dependence on physical hardware for core tool validation.

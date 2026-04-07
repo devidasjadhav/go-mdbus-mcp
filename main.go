@@ -35,6 +35,9 @@ func main() {
 	modbusRetryOnWrite := flag.Bool("modbus-retry-on-write", false, "Allow retries on write operations")
 	modbusCircuitTripAfter := flag.Int("modbus-circuit-trip-after", 3, "Consecutive failures before opening circuit")
 	modbusCircuitOpenFor := flag.Duration("modbus-circuit-open-for", 2*time.Second, "Duration to keep circuit open after trip")
+	mockMode := flag.Bool("mock-mode", false, "Run without real Modbus device using in-memory mock client")
+	mockRegisters := flag.Int("mock-registers", 1024, "Mock holding register count (mock-mode)")
+	mockCoils := flag.Int("mock-coils", 1024, "Mock coil count (mock-mode)")
 	transportFlag := flag.String("transport", "streamable", "Transport to use: stdio, sse, or streamable")
 	showVersion := flag.Bool("version", false, "Show version information")
 	flag.Parse()
@@ -51,7 +54,7 @@ func main() {
 			log.Fatalf("Failed to load config: %v", err)
 		}
 		fileCfg = cfg
-		if err := applyConfigOverrides(fileCfg, setFlags, modbusIP, modbusPort, modbusTimeout, modbusIdleTimeout, modbusRetryAttempts, modbusRetryBackoff, modbusRetryOnWrite, modbusCircuitTripAfter, modbusCircuitOpenFor, transportFlag); err != nil {
+		if err := applyConfigOverrides(fileCfg, setFlags, modbusIP, modbusPort, modbusTimeout, modbusIdleTimeout, modbusRetryAttempts, modbusRetryBackoff, modbusRetryOnWrite, modbusCircuitTripAfter, modbusCircuitOpenFor, mockMode, mockRegisters, mockCoils, transportFlag); err != nil {
 			log.Fatalf("Invalid config value: %v", err)
 		}
 		if fileCfg.TagMapCSV != nil && !setFlags["tag-map-csv"] {
@@ -68,6 +71,9 @@ func main() {
 	fmt.Fprintf(os.Stderr, "🚀 Modbus MCP Server v%s\n", version)
 	fmt.Fprintf(os.Stderr, "📡 Connecting to Modbus server at %s:%d\n", *modbusIP, *modbusPort)
 	fmt.Fprintf(os.Stderr, "🔌 Using %s transport\n", *transportFlag)
+	if *mockMode {
+		fmt.Fprintf(os.Stderr, "🧪 Mock mode enabled (registers=%d, coils=%d)\n", *mockRegisters, *mockCoils)
+	}
 
 	// Create Modbus client
 	modbusClient := modbus.NewModbusClient(&modbus.Config{
@@ -81,6 +87,9 @@ func main() {
 		RetryOnWrite:     *modbusRetryOnWrite,
 		CircuitTripAfter: *modbusCircuitTripAfter,
 		CircuitOpenFor:   *modbusCircuitOpenFor,
+		UseMock:          *mockMode,
+		MockRegisters:    *mockRegisters,
+		MockCoils:        *mockCoils,
 	})
 	defer func() {
 		if err := modbusClient.Close(); err != nil {

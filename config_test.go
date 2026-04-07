@@ -24,6 +24,9 @@ func TestApplyConfigOverrides_RespectsFlagPrecedence(t *testing.T) {
 	modbusRetryOnWrite := ptr(false)
 	modbusCircuitTripAfter := ptr(3)
 	modbusCircuitOpenFor := ptr(2 * time.Second)
+	mockMode := ptr(false)
+	mockRegisters := ptr(1024)
+	mockCoils := ptr(1024)
 	transport := ptr("streamable")
 
 	setFlags := map[string]bool{"modbus-ip": true}
@@ -39,6 +42,9 @@ func TestApplyConfigOverrides_RespectsFlagPrecedence(t *testing.T) {
 		modbusRetryOnWrite,
 		modbusCircuitTripAfter,
 		modbusCircuitOpenFor,
+		mockMode,
+		mockRegisters,
+		mockCoils,
 		transport,
 	)
 	if err != nil {
@@ -71,6 +77,9 @@ func TestApplyConfigOverrides_InvalidDuration(t *testing.T) {
 	modbusRetryOnWrite := ptr(false)
 	modbusCircuitTripAfter := ptr(3)
 	modbusCircuitOpenFor := ptr(2 * time.Second)
+	mockMode := ptr(false)
+	mockRegisters := ptr(1024)
+	mockCoils := ptr(1024)
 	transport := ptr("streamable")
 
 	err := applyConfigOverrides(
@@ -85,6 +94,9 @@ func TestApplyConfigOverrides_InvalidDuration(t *testing.T) {
 		modbusRetryOnWrite,
 		modbusCircuitTripAfter,
 		modbusCircuitOpenFor,
+		mockMode,
+		mockRegisters,
+		mockCoils,
 		transport,
 	)
 	if err == nil {

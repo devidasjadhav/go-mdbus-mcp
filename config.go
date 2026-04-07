@@ -25,6 +25,9 @@ type AppConfig struct {
 	CircuitTripAfter    *int    `json:"modbus_circuit_trip_after" yaml:"modbus_circuit_trip_after"`
 	CircuitOpenFor      *string `json:"modbus_circuit_open_for" yaml:"modbus_circuit_open_for"`
 	Transport           *string `json:"transport" yaml:"transport"`
+	MockMode            *bool   `json:"mock_mode" yaml:"mock_mode"`
+	MockRegisters       *int    `json:"mock_registers" yaml:"mock_registers"`
+	MockCoils           *int    `json:"mock_coils" yaml:"mock_coils"`
 
 	WritePolicy *WritePolicyConfig `json:"write_policy" yaml:"write_policy"`
 	Tags        []TagConfig        `json:"tags" yaml:"tags"`
@@ -93,6 +96,9 @@ func applyConfigOverrides(
 	modbusRetryOnWrite *bool,
 	modbusCircuitTripAfter *int,
 	modbusCircuitOpenFor *time.Duration,
+	mockMode *bool,
+	mockRegisters *int,
+	mockCoils *int,
 	transportFlag *string,
 ) error {
 	if cfg == nil {
@@ -116,6 +122,15 @@ func applyConfigOverrides(
 	}
 	if cfg.Transport != nil && !setFlags["transport"] {
 		*transportFlag = *cfg.Transport
+	}
+	if cfg.MockMode != nil && !setFlags["mock-mode"] {
+		*mockMode = *cfg.MockMode
+	}
+	if cfg.MockRegisters != nil && !setFlags["mock-registers"] {
+		*mockRegisters = *cfg.MockRegisters
+	}
+	if cfg.MockCoils != nil && !setFlags["mock-coils"] {
+		*mockCoils = *cfg.MockCoils
 	}
 
 	if cfg.ModbusTimeout != nil && !setFlags["modbus-timeout"] {
