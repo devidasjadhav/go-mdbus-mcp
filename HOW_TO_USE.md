@@ -26,6 +26,12 @@ Or load from config file:
 ./modbus-server --config ./server-config.yaml
 ```
 
+Or load semantic tags from CSV directly:
+
+```bash
+./modbus-server --tag-map-csv ./tag-map.csv
+```
+
 If you need write tools during validation, enable them explicitly:
 
 ```bash
@@ -101,6 +107,14 @@ With `tags` configured in `server-config.yaml`, use semantic tag tools:
 - `list-tags()`
 - `read-tag(name="ambient_temp_raw")`
 - `write-tag(name="run_command", coil_values=[true])`
+
+Typed write examples:
+
+- `write-tag(name="boiler_temp_c", numeric_value=42.5)`
+- `write-tag(name="device_label", string_value="PUMP-A")`
+- `write-tag(name="run_command", bool_value=true)`
+
+For typed reads, define `data_type` in CSV (`float32`, `string`, etc.).
 
 Notes:
 

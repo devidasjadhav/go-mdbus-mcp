@@ -1,0 +1,5 @@
+name,kind,address,quantity,slave_id,access,data_type,byte_order,word_order,scale,offset,description
+ambient_temp_raw,holding_register,0,1,1,read,uint16,big,msw,1,0,Raw ambient temperature register
+boiler_temp_c,holding_register,10,2,1,read,float32,big,msw,1,0,Boiler temperature in Celsius
+device_label,holding_register,20,4,1,read,string,big,msw,1,0,ASCII device label
+run_command,coil,0,1,1,read_write,bool,big,msw,1,0,Run command coil

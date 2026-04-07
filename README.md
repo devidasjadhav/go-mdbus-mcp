@@ -24,7 +24,7 @@ The server exposes the following MCP Tools to your LLM:
 5. `get-modbus-client-status`: Inspect retry counters, failures, and circuit state.
 6. `list-tags`: List configured semantic tag definitions.
 7. `read-tag`: Read by semantic tag name.
-8. `write-tag`: Write by semantic tag name (subject to write policy).
+8. `write-tag`: Write by semantic tag name (subject to write policy), with raw arrays or typed values (`numeric_value`, `string_value`, `bool_value`).
 
 ## Quick Start
 
@@ -40,6 +40,9 @@ go build -o modbus-server main.go
 
 # Load settings from YAML/JSON config file
 ./modbus-server --config ./server-config.yaml
+
+# Or pass tag mapping CSV directly
+./modbus-server --tag-map-csv ./tag-map.csv
 
 # Connect to a specific PLC IP and Port using STDIO (Best for Claude Desktop / Cursor)
 ./modbus-server --modbus-ip 10.0.0.50 --modbus-port 502 --transport stdio
@@ -61,7 +64,9 @@ Write policy environment variables:
 - `MODBUS_WRITE_ALLOWLIST_HOLDING`: optional allowlist override for holding-register writes
 - `MODBUS_WRITE_ALLOWLIST_COILS`: optional allowlist override for coil writes
 
-You can also set write policy and retry settings in config file (YAML/JSON). CLI flags override config file values.
+You can also set write policy, retry settings, and tag-map CSV in config file (YAML/JSON). CLI flags override config file values.
+
+Recommended: keep semantic tag definitions in CSV (`tag_map_csv`) rather than embedding tags directly in config.
 
 Example `server-config.yaml`:
 
@@ -69,6 +74,7 @@ Example `server-config.yaml`:
 modbus_ip: 192.168.1.22
 modbus_port: 5002
 transport: streamable
+tag_map_csv: ./tag-map.csv
 modbus_timeout: 10s
 modbus_idle_timeout: 2s
 modbus_retry_attempts: 3
@@ -82,19 +88,26 @@ write_policy:
   write_allowlist: "0-9"
   holding_write_allowlist: "0-20"
   coil_write_allowlist: "0-5"
-
-tags:
-  - name: ambient_temp_raw
-    kind: holding_register
-    address: 0
-    quantity: 1
-    access: read
-  - name: run_command
-    kind: coil
-    address: 0
-    quantity: 1
-    access: read_write
 ```
+
+Tag CSV columns:
+
+- Required: `name`, `kind`, `address`
+- Optional: `quantity`, `slave_id`, `access`, `data_type`, `byte_order`, `word_order`, `scale`, `offset`, `description`
+
+Supported `data_type` for holding-register tags:
+
+- `uint16`, `int16`, `uint32`, `int32`, `float32`, `string`
+
+Supported `data_type` for coil tags:
+
+- `bool`
+
+Typed `write-tag` inputs:
+
+- `numeric_value` for numeric holding tags
+- `string_value` for string holding tags
+- `bool_value` for single-coil tags (`quantity=1`)
 
 ### Docker Usage
 

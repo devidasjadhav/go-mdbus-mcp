@@ -1,10 +1,12 @@
 package main
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -26,6 +28,7 @@ type AppConfig struct {
 
 	WritePolicy *WritePolicyConfig `json:"write_policy" yaml:"write_policy"`
 	Tags        []TagConfig        `json:"tags" yaml:"tags"`
+	TagMapCSV   *string            `json:"tag_map_csv" yaml:"tag_map_csv"`
 }
 
 type WritePolicyConfig struct {
@@ -36,12 +39,18 @@ type WritePolicyConfig struct {
 }
 
 type TagConfig struct {
-	Name     string `json:"name" yaml:"name"`
-	Kind     string `json:"kind" yaml:"kind"`
-	Address  uint16 `json:"address" yaml:"address"`
-	Quantity uint16 `json:"quantity" yaml:"quantity"`
-	SlaveID  *uint8 `json:"slave_id,omitempty" yaml:"slave_id,omitempty"`
-	Access   string `json:"access" yaml:"access"`
+	Name        string  `json:"name" yaml:"name"`
+	Kind        string  `json:"kind" yaml:"kind"`
+	Address     uint16  `json:"address" yaml:"address"`
+	Quantity    uint16  `json:"quantity" yaml:"quantity"`
+	SlaveID     *uint8  `json:"slave_id,omitempty" yaml:"slave_id,omitempty"`
+	Access      string  `json:"access" yaml:"access"`
+	DataType    string  `json:"data_type,omitempty" yaml:"data_type,omitempty"`
+	ByteOrder   string  `json:"byte_order,omitempty" yaml:"byte_order,omitempty"`
+	WordOrder   string  `json:"word_order,omitempty" yaml:"word_order,omitempty"`
+	Scale       float64 `json:"scale,omitempty" yaml:"scale,omitempty"`
+	Offset      float64 `json:"offset,omitempty" yaml:"offset,omitempty"`
+	Description string  `json:"description,omitempty" yaml:"description,omitempty"`
 }
 
 func loadAppConfig(path string) (*AppConfig, error) {
@@ -153,7 +162,15 @@ func toWritePolicyOverrides(cfg *AppConfig) *modbus.WritePolicyOverrides {
 	}
 }
 
-func toTagMap(cfg *AppConfig) (*modbus.TagMap, error) {
+func toTagMap(cfg *AppConfig, csvPath string) (*modbus.TagMap, error) {
+	if strings.TrimSpace(csvPath) != "" {
+		tags, err := loadTagsFromCSV(csvPath)
+		if err != nil {
+			return nil, err
+		}
+		return modbus.NewTagMap(tags)
+	}
+
 	if cfg == nil || len(cfg.Tags) == 0 {
 		return nil, nil
 	}
@@ -161,14 +178,148 @@ func toTagMap(cfg *AppConfig) (*modbus.TagMap, error) {
 	tags := make([]modbus.TagDef, 0, len(cfg.Tags))
 	for _, t := range cfg.Tags {
 		tags = append(tags, modbus.TagDef{
-			Name:     t.Name,
-			Kind:     modbus.TagKind(t.Kind),
-			Address:  t.Address,
-			Quantity: t.Quantity,
-			SlaveID:  t.SlaveID,
-			Access:   modbus.TagAccess(t.Access),
+			Name:        t.Name,
+			Kind:        modbus.TagKind(t.Kind),
+			Address:     t.Address,
+			Quantity:    t.Quantity,
+			SlaveID:     t.SlaveID,
+			Access:      modbus.TagAccess(t.Access),
+			DataType:    t.DataType,
+			ByteOrder:   t.ByteOrder,
+			WordOrder:   t.WordOrder,
+			Scale:       t.Scale,
+			Offset:      t.Offset,
+			Description: t.Description,
 		})
 	}
 
 	return modbus.NewTagMap(tags)
+}
+
+func loadTagsFromCSV(path string) ([]modbus.TagDef, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open tag csv %s: %w", path, err)
+	}
+	defer f.Close()
+
+	r := csv.NewReader(f)
+	r.FieldsPerRecord = -1
+
+	records, err := r.ReadAll()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read tag csv: %w", err)
+	}
+	if len(records) < 1 {
+		return nil, fmt.Errorf("tag csv is empty")
+	}
+
+	headers := map[string]int{}
+	for i, h := range records[0] {
+		headers[normalizeHeader(h)] = i
+	}
+	for _, req := range []string{"name", "kind", "address"} {
+		if _, ok := headers[req]; !ok {
+			return nil, fmt.Errorf("tag csv missing required column %q", req)
+		}
+	}
+
+	tags := make([]modbus.TagDef, 0, len(records)-1)
+	for rowIdx, row := range records[1:] {
+		rowNum := rowIdx + 2
+		name := cell(row, headers, "name")
+		if strings.TrimSpace(name) == "" {
+			continue
+		}
+
+		address, err := parseUint16CSV(cell(row, headers, "address"))
+		if err != nil {
+			return nil, fmt.Errorf("row %d invalid address: %w", rowNum, err)
+		}
+
+		quantity := uint16(0)
+		if qRaw := strings.TrimSpace(cell(row, headers, "quantity")); qRaw != "" {
+			q, err := parseUint16CSV(qRaw)
+			if err != nil {
+				return nil, fmt.Errorf("row %d invalid quantity: %w", rowNum, err)
+			}
+			quantity = q
+		}
+
+		var slaveID *uint8
+		if sRaw := strings.TrimSpace(cell(row, headers, "slave_id")); sRaw != "" {
+			s, err := strconv.ParseUint(sRaw, 10, 8)
+			if err != nil {
+				return nil, fmt.Errorf("row %d invalid slave_id: %w", rowNum, err)
+			}
+			sv := uint8(s)
+			slaveID = &sv
+		}
+
+		scale := 0.0
+		if scaleRaw := strings.TrimSpace(cell(row, headers, "scale")); scaleRaw != "" {
+			s, err := strconv.ParseFloat(scaleRaw, 64)
+			if err != nil {
+				return nil, fmt.Errorf("row %d invalid scale: %w", rowNum, err)
+			}
+			scale = s
+		}
+
+		offset := 0.0
+		if offRaw := strings.TrimSpace(cell(row, headers, "offset")); offRaw != "" {
+			o, err := strconv.ParseFloat(offRaw, 64)
+			if err != nil {
+				return nil, fmt.Errorf("row %d invalid offset: %w", rowNum, err)
+			}
+			offset = o
+		}
+
+		tags = append(tags, modbus.TagDef{
+			Name:        name,
+			Kind:        modbus.TagKind(cellDefault(row, headers, "kind", "holding_register")),
+			Address:     address,
+			Quantity:    quantity,
+			SlaveID:     slaveID,
+			Access:      modbus.TagAccess(cellDefault(row, headers, "access", "read")),
+			DataType:    cell(row, headers, "data_type"),
+			ByteOrder:   cell(row, headers, "byte_order"),
+			WordOrder:   cell(row, headers, "word_order"),
+			Scale:       scale,
+			Offset:      offset,
+			Description: cell(row, headers, "description"),
+		})
+	}
+
+	return tags, nil
+}
+
+func normalizeHeader(v string) string {
+	v = strings.ToLower(strings.TrimSpace(v))
+	v = strings.ReplaceAll(v, " ", "_")
+	v = strings.ReplaceAll(v, "-", "_")
+	return v
+}
+
+func cell(row []string, headers map[string]int, key string) string {
+	idx, ok := headers[key]
+	if !ok || idx >= len(row) {
+		return ""
+	}
+	return strings.TrimSpace(row[idx])
+}
+
+func cellDefault(row []string, headers map[string]int, key string, fallback string) string {
+	v := cell(row, headers, key)
+	if v == "" {
+		return fallback
+	}
+	return v
+}
+
+func parseUint16CSV(raw string) (uint16, error) {
+	v, err := strconv.ParseUint(strings.TrimSpace(raw), 10, 16)
+	if err != nil {
+		return 0, err
+	}
+	return uint16(v), nil
 }

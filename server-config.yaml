@@ -1,6 +1,7 @@
 modbus_ip: 192.168.1.22
 modbus_port: 5002
 transport: streamable
+tag_map_csv: ./tag-map.csv
 
 modbus_timeout: 10s
 modbus_idle_timeout: 2s
@@ -16,15 +17,3 @@ write_policy:
   write_allowlist: "0-9"
   holding_write_allowlist: "0-20"
   coil_write_allowlist: "0-5"
-
-tags:
-  - name: ambient_temp_raw
-    kind: holding_register
-    address: 0
-    quantity: 1
-    access: read
-  - name: run_command
-    kind: coil
-    address: 0
-    quantity: 1
-    access: read_write

@@ -23,12 +23,18 @@ const (
 
 // TagDef describes a semantic Modbus tag.
 type TagDef struct {
-	Name     string    `json:"name"`
-	Kind     TagKind   `json:"kind"`
-	Address  uint16    `json:"address"`
-	Quantity uint16    `json:"quantity"`
-	SlaveID  *uint8    `json:"slave_id,omitempty"`
-	Access   TagAccess `json:"access"`
+	Name        string    `json:"name"`
+	Kind        TagKind   `json:"kind"`
+	Address     uint16    `json:"address"`
+	Quantity    uint16    `json:"quantity"`
+	SlaveID     *uint8    `json:"slave_id,omitempty"`
+	Access      TagAccess `json:"access"`
+	DataType    string    `json:"data_type,omitempty"`
+	ByteOrder   string    `json:"byte_order,omitempty"`
+	WordOrder   string    `json:"word_order,omitempty"`
+	Scale       float64   `json:"scale,omitempty"`
+	Offset      float64   `json:"offset,omitempty"`
+	Description string    `json:"description,omitempty"`
 }
 
 type TagMap struct {
@@ -44,17 +50,44 @@ func NewTagMap(tags []TagDef) (*TagMap, error) {
 	byName := make(map[string]TagDef, len(tags))
 	for _, tag := range tags {
 		tag.Name = strings.TrimSpace(tag.Name)
+		tag.Description = strings.TrimSpace(tag.Description)
+		tag.Kind = TagKind(strings.ToLower(strings.TrimSpace(string(tag.Kind))))
+		tag.Access = TagAccess(strings.ToLower(strings.TrimSpace(string(tag.Access))))
 		if tag.Name == "" {
 			return nil, fmt.Errorf("tag name must not be empty")
 		}
 		if _, exists := byName[tag.Name]; exists {
 			return nil, fmt.Errorf("duplicate tag name %q", tag.Name)
 		}
-		if tag.Quantity == 0 {
-			return nil, fmt.Errorf("tag %q quantity must be greater than 0", tag.Name)
+		tag.DataType = normalizeDataType(tag.DataType)
+		tag.ByteOrder = normalizeByteOrder(tag.ByteOrder)
+		tag.WordOrder = normalizeWordOrder(tag.WordOrder)
+		if tag.Kind == TagKindCoil && tag.DataType == "" {
+			tag.DataType = "bool"
 		}
+		if tag.Kind == TagKindHolding && tag.DataType == "" {
+			tag.DataType = "uint16"
+		}
+		if tag.Scale == 0 {
+			tag.Scale = 1
+		}
+
+		expectedQty := expectedQuantity(tag.Kind, tag.DataType)
+		if tag.Quantity == 0 {
+			if expectedQty == 0 {
+				return nil, fmt.Errorf("tag %q quantity must be provided", tag.Name)
+			}
+			tag.Quantity = expectedQty
+		}
+		if expectedQty > 0 && tag.Quantity != expectedQty {
+			return nil, fmt.Errorf("tag %q quantity %d does not match data_type %s (expected %d)", tag.Name, tag.Quantity, tag.DataType, expectedQty)
+		}
+
 		if tag.Kind != TagKindHolding && tag.Kind != TagKindCoil {
 			return nil, fmt.Errorf("tag %q has invalid kind %q", tag.Name, tag.Kind)
+		}
+		if err := validateDataType(tag); err != nil {
+			return nil, err
 		}
 		if tag.Access == "" {
 			tag.Access = TagAccessRead
@@ -100,4 +133,79 @@ func (t TagDef) Readable() bool {
 
 func (t TagDef) Writable() bool {
 	return t.Access == TagAccessWrite || t.Access == TagAccessReadWrite
+}
+
+func normalizeDataType(dataType string) string {
+	v := strings.ToLower(strings.TrimSpace(dataType))
+	if v == "" {
+		return ""
+	}
+	return v
+}
+
+func normalizeByteOrder(byteOrder string) string {
+	v := strings.ToLower(strings.TrimSpace(byteOrder))
+	if v == "" {
+		return "big"
+	}
+	if v != "big" && v != "little" {
+		return ""
+	}
+	return v
+}
+
+func normalizeWordOrder(wordOrder string) string {
+	v := strings.ToLower(strings.TrimSpace(wordOrder))
+	if v == "" {
+		return "msw"
+	}
+	if v != "msw" && v != "lsw" {
+		return ""
+	}
+	return v
+}
+
+func expectedQuantity(kind TagKind, dataType string) uint16 {
+	if kind == TagKindCoil {
+		return 1
+	}
+	switch dataType {
+	case "", "uint16", "int16":
+		return 1
+	case "uint32", "int32", "float32":
+		return 2
+	case "string":
+		return 0
+	default:
+		return 0
+	}
+}
+
+func validateDataType(tag TagDef) error {
+	if tag.ByteOrder == "" {
+		return fmt.Errorf("tag %q has invalid byte_order", tag.Name)
+	}
+	if tag.WordOrder == "" {
+		return fmt.Errorf("tag %q has invalid word_order", tag.Name)
+	}
+
+	if tag.Kind == TagKindCoil {
+		if tag.DataType == "" {
+			tag.DataType = "bool"
+		}
+		if tag.DataType != "bool" {
+			return fmt.Errorf("tag %q coil supports only data_type=bool", tag.Name)
+		}
+		return nil
+	}
+
+	if tag.DataType == "" {
+		tag.DataType = "uint16"
+	}
+	switch tag.DataType {
+	case "uint16", "int16", "uint32", "int32", "float32", "string":
+		return nil
+	default:
+		return fmt.Errorf("tag %q has unsupported data_type %q", tag.Name, tag.DataType)
+	}
 }

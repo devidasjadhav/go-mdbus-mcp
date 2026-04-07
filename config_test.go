@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -97,7 +99,7 @@ func TestToTagMap(t *testing.T) {
 		},
 	}
 
-	tagMap, err := toTagMap(cfg)
+	tagMap, err := toTagMap(cfg, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -106,6 +108,61 @@ func TestToTagMap(t *testing.T) {
 	}
 	if _, ok := tagMap.Get("ambient_temp"); !ok {
 		t.Fatalf("expected configured tag to exist")
+	}
+}
+
+func TestToTagMap_FromCSV(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tags.csv")
+	csv := "name,kind,address,quantity,access,data_type\nboiler_temp,holding_register,20,2,read,float32\n"
+	if err := os.WriteFile(path, []byte(csv), 0644); err != nil {
+		t.Fatalf("failed to write temp csv: %v", err)
+	}
+
+	tagMap, err := toTagMap(nil, path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if tagMap == nil {
+		t.Fatalf("expected tag map")
+	}
+	tag, ok := tagMap.Get("boiler_temp")
+	if !ok {
+		t.Fatalf("expected CSV tag to exist")
+	}
+	if tag.DataType != "float32" {
+		t.Fatalf("expected data_type float32, got %q", tag.DataType)
+	}
+}
+
+func TestToTagMap_FromCSV_QuantityDerivedFromDataType(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tags.csv")
+	csv := "name,kind,address,access,data_type\nboiler_temp,holding_register,20,read,float32\n"
+	if err := os.WriteFile(path, []byte(csv), 0644); err != nil {
+		t.Fatalf("failed to write temp csv: %v", err)
+	}
+
+	tagMap, err := toTagMap(nil, path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	tag, ok := tagMap.Get("boiler_temp")
+	if !ok {
+		t.Fatalf("expected CSV tag to exist")
+	}
+	if tag.Quantity != 2 {
+		t.Fatalf("expected derived quantity 2 for float32, got %d", tag.Quantity)
+	}
+}
+
+func TestToTagMap_FromCSV_MissingRequiredColumn(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tags.csv")
+	csv := "name,kind\nboiler_temp,holding_register\n"
+	if err := os.WriteFile(path, []byte(csv), 0644); err != nil {
+		t.Fatalf("failed to write temp csv: %v", err)
+	}
+
+	if _, err := toTagMap(nil, path); err == nil {
+		t.Fatalf("expected missing required column error")
 	}
 }
 

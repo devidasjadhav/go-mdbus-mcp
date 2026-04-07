@@ -176,3 +176,88 @@ Scope validated:
 ## Conclusion (Phase 1 + Phase 2)
 
 The server is validated for safety gating and config-driven runtime controls. Core policy and configuration paths are covered with both runtime checks and unit tests.
+
+## Phase 3: CSV Tag Mapping + Typed Tag Reads
+
+Date: 2026-04-07
+
+Scope validated:
+
+- CSV-based tag loading (`--tag-map-csv` and `tag_map_csv` in config)
+- Data type decoding for `float32` and `string` on holding-register tags
+- Required CSV header validation and fail-fast behavior
+- Quantity derivation from data type (`float32` => quantity `2` when omitted)
+- Makefile run-argument behavior with config compatibility
+
+### Test Log
+
+1) Unit tests for CSV mapping and codec behavior
+
+- Added/updated tests:
+  - `modbus/tag_codec_test.go`
+  - `config_test.go` (CSV load, quantity derivation, missing required column)
+- Command:
+  - `go test ./...`
+- Actual:
+  - `ok github.com/devidasjadhav/go-mdbus-mcp`
+  - `ok github.com/devidasjadhav/go-mdbus-mcp/modbus`
+- Result: PASS
+
+2) Runtime smoke with config + CSV mapping
+
+- Commands:
+  - `go build -o modbus-server .`
+  - `timeout 4 ./modbus-server --config ./server-config.yaml --transport stdio`
+- Expected:
+  - tag map loaded and startup banner shows count
+- Actual:
+  - `Loaded 4 configured tags`
+- Result: PASS
+
+3) Makefile run target behavior with config
+
+- Command:
+  - `make run CONFIG=./server-config.yaml TRANSPORT=stdio ARGS="--version"`
+- Expected:
+  - should not force default IP/port flags that override config
+- Actual:
+  - command uses `--transport` and `--config` only (plus extra args)
+- Result: PASS
+
+## Conclusion (Phase 1 + Phase 2 + Phase 3)
+
+Safety gating, recovery controls, and CSV-driven semantic tags with typed reads are validated through unit tests and runtime smoke checks.
+
+## Phase 4: Typed Tag Writes
+
+Date: 2026-04-07
+
+Scope validated:
+
+- `write-tag` supports typed inputs in addition to raw arrays
+  - `numeric_value` for numeric holding tags
+  - `string_value` for string holding tags
+  - `bool_value` for single-coil tags
+- Encoding paths for `float32` and `string` are covered by unit tests
+
+### Test Log
+
+1) Unit tests for typed encode/decode paths
+
+- Added/updated tests:
+  - `modbus/tag_codec_test.go`
+- Covered:
+  - decode `float32`
+  - decode `string`
+  - encode `float32`
+  - encode `string`
+- Command:
+  - `go test ./...`
+- Actual:
+  - `ok github.com/devidasjadhav/go-mdbus-mcp`
+  - `ok github.com/devidasjadhav/go-mdbus-mcp/modbus`
+- Result: PASS
+
+## Conclusion (Phase 1-4)
+
+The server now supports guarded writes, recovery controls, CSV-based semantic tags, typed tag reads, and typed tag writes with automated test coverage.

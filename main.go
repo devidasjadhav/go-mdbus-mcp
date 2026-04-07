@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -24,6 +25,7 @@ func main() {
 	log.SetOutput(os.Stderr)
 
 	configPath := flag.String("config", "", "Path to YAML/JSON config file")
+	tagMapCSV := flag.String("tag-map-csv", "", "Path to CSV tag mapping file")
 	modbusIP := flag.String("modbus-ip", "192.168.1.22", "Modbus server IP address")
 	modbusPort := flag.Int("modbus-port", 5002, "Modbus server port")
 	modbusTimeout := flag.Duration("modbus-timeout", 10*time.Second, "Modbus request timeout (e.g. 10s)")
@@ -51,6 +53,9 @@ func main() {
 		fileCfg = cfg
 		if err := applyConfigOverrides(fileCfg, setFlags, modbusIP, modbusPort, modbusTimeout, modbusIdleTimeout, modbusRetryAttempts, modbusRetryBackoff, modbusRetryOnWrite, modbusCircuitTripAfter, modbusCircuitOpenFor, transportFlag); err != nil {
 			log.Fatalf("Invalid config value: %v", err)
+		}
+		if fileCfg.TagMapCSV != nil && !setFlags["tag-map-csv"] {
+			*tagMapCSV = resolveConfigRelativePath(*configPath, *fileCfg.TagMapCSV)
 		}
 	}
 
@@ -94,7 +99,7 @@ func main() {
 		log.Fatalf("Invalid write policy configuration: %v", err)
 	}
 
-	tagMap, err := toTagMap(fileCfg)
+	tagMap, err := toTagMap(fileCfg, *tagMapCSV)
 	if err != nil {
 		log.Fatalf("Invalid tag configuration: %v", err)
 	}
@@ -198,4 +203,15 @@ func setupHealthCheck(mux *http.ServeMux) {
 			"service": "modbus-mcp-server",
 		})
 	})
+}
+
+func resolveConfigRelativePath(configPath string, candidate string) string {
+	candidate = strings.TrimSpace(candidate)
+	if candidate == "" {
+		return ""
+	}
+	if filepath.IsAbs(candidate) {
+		return candidate
+	}
+	return filepath.Join(filepath.Dir(configPath), candidate)
 }
