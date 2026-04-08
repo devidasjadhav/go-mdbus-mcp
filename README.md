@@ -25,11 +25,12 @@ The server exposes the following MCP Tools to your LLM:
 4. `read-discrete-inputs`: Read Modbus discrete inputs.
 5. `read-holding-registers-typed`: Read and decode typed holding-register values (`uint16`, `int16`, `uint32`, `int32`, `float32`, `string`) with optional byte/word order and scale/offset.
 6. `write-holding-registers`: Write an array of `uint16` values sequentially starting at a specified address.
-7. `write-coils`: Write an array of `boolean` flags sequentially starting at a specified address.
-8. `get-modbus-client-status`: Inspect retry counters, failures, and circuit state.
-9. `list-tags`: List configured semantic tag definitions.
-10. `read-tag`: Read by semantic tag name.
-11. `write-tag`: Write by semantic tag name (subject to write policy), with raw arrays or typed values (`numeric_value`, `string_value`, `bool_value`).
+7. `write-holding-registers-typed`: Encode and write typed holding-register values (`uint16`, `int16`, `uint32`, `int32`, `float32`, `string`) with optional byte/word order and scale/offset.
+8. `write-coils`: Write an array of `boolean` flags sequentially starting at a specified address.
+9. `get-modbus-client-status`: Inspect retry counters, failures, and circuit state.
+10. `list-tags`: List configured semantic tag definitions.
+11. `read-tag`: Read by semantic tag name.
+12. `write-tag`: Write by semantic tag name (subject to write policy), with raw arrays or typed values (`numeric_value`, `string_value`, `bool_value`).
 
 ## Quick Start
 

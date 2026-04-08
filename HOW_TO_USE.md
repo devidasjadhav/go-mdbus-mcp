@@ -127,6 +127,69 @@ Notes:
 - `write-tag` is still guarded by write policy.
 - `write-tag` value array length must match configured tag `quantity`.
 
+### 8) Typed holding-register write + raw read-back
+
+Use this when you want to write `float32`, `int32`, `uint32`, `int16`, `uint16`, or `string` directly without creating a tag.
+
+Examples from OpenCode:
+
+- `modbus_write-holding-registers-typed(address=100, data_type="float32", numeric_value=12.5)`
+- `modbus_read-holding-registers(address=100, quantity=2)`
+- `modbus_write-holding-registers-typed(address=110, data_type="string", quantity=2, string_value="ABC")`
+- `modbus_read-holding-registers(address=110, quantity=2)`
+
+Expected behavior:
+
+- Typed write returns both logical input and encoded raw register values.
+- Raw read shows the exact register words that were written.
+
+### 9) Curl JSON-RPC validation (streamable transport)
+
+Start server in mock mode with writes enabled:
+
+```bash
+MODBUS_WRITES_ENABLED=true ./modbus-server --mock-mode --transport streamable
+```
+
+Initialize MCP session:
+
+```bash
+curl -X POST "http://127.0.0.1:8080/mcp" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  --data '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"curl-test","version":"1"}},"id":1}'
+```
+
+Write a string and validate each register individually:
+
+```bash
+# Write "HELLO" across 3 registers
+curl -X POST "http://127.0.0.1:8080/mcp" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  --data '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"write-holding-registers-typed","arguments":{"address":200,"data_type":"string","quantity":3,"string_value":"HELLO"}},"id":2}'
+
+# Read each register separately
+curl -X POST "http://127.0.0.1:8080/mcp" -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" --data '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"read-holding-registers","arguments":{"address":200,"quantity":1}},"id":3}'
+curl -X POST "http://127.0.0.1:8080/mcp" -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" --data '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"read-holding-registers","arguments":{"address":201,"quantity":1}},"id":4}'
+curl -X POST "http://127.0.0.1:8080/mcp" -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" --data '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"read-holding-registers","arguments":{"address":202,"quantity":1}},"id":5}'
+```
+
+Expected individual words for `"HELLO"`:
+
+- register `200`: `18501` (`'H' 'E'`)
+- register `201`: `19532` (`'L' 'L'`)
+- register `202`: `20224` (`'O' '\x00'`)
+
+Optional typed read verification:
+
+```bash
+curl -X POST "http://127.0.0.1:8080/mcp" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  --data '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"read-holding-registers-typed","arguments":{"address":200,"quantity":3,"data_type":"string"}},"id":6}'
+```
+
 ## What Was Verified In This Project
 
 The OpenCode test session verified:
@@ -134,6 +197,8 @@ The OpenCode test session verified:
 - Single register writes now use FC06 and read back correctly.
 - Multi-register writes/reads work end-to-end with FC10/FC03.
 - Coil write/read works for single and multiple values.
+- Typed holding-register writes (`write-holding-registers-typed`) work for numeric and string data types.
+- Raw read-back (`read-holding-registers`) validates encoded register words, including individual register reads for string payloads.
 - Validation errors are returned for `quantity=0` and empty write arrays.
 - Reconnect behavior is stable with short Modbus idle timeouts.
 
